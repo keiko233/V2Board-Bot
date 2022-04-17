@@ -2,10 +2,11 @@ package service
 
 import (
 	"fmt"
-	tb "gopkg.in/tucnak/telebot.v2"
-	"os"
+	"log"
 	"strings"
 	"time"
+
+	tb "gopkg.in/tucnak/telebot.v2"
 )
 
 var Bot *tb.Bot
@@ -18,8 +19,7 @@ func Start() {
 		Poller: &tb.LongPoller{Timeout: 10 * time.Second},
 	})
 	if err != nil {
-		fmt.Printf("Bot 启动失败啦...... \n当前Token [ %s ] \n错误信息:  %s", c.Bot.Token, err)
-		os.Exit(1)
+		log.Fatalf("Bot 启动失败啦...... \n当前Token [ %s ] \n错误信息:  %s", c.Bot.Token, err)
 	}
 
 	setHandle()
@@ -53,40 +53,42 @@ func startCmdCtr(m *tb.Message) {
 	Bot.Handle(&UnbindBtn, unbindCmdCtr)
 
 	msg := fmt.Sprintf("%s\n为你提供以下服务:\n\n每日签到 /checkin\n账户信息 /account\n绑定账户 /bind\n解绑账户 /unbind", c.Bot.Name)
-	_, _ = Bot.Send(m.Chat, msg, menu)
+	_, _ = Bot.Reply(m, msg, menu)
 }
 
 func checkinCmdCtr(m *tb.Message) {
-	user := QueryUser(m.Chat.ID)
+	user := QueryUser(m.Sender.ID)
 	if user.Id <= 0 {
 		msg := "👀 当前未绑定账户\n请发送 /bind <订阅地址> 绑定账户"
-		_, _ = Bot.Send(m.Sender, msg)
+		_, _ = Bot.Reply(m, msg)
 		return
 	}
 	if user.PlanId <= 0 {
 		msg := "👀 当前暂无订阅计划,该功能需要订阅后使用～"
-		_, _ = Bot.Send(m.Sender, msg)
+		_, _ = Bot.Reply(m, msg)
 		return
 	}
 
-	cc := CheckinTime(m.Chat.ID)
+	cc := CheckinTime(m.Sender.ID)
 	if cc == false {
 		msg := fmt.Sprintf("✅ 今天已经签到过啦！明天再来哦～")
-		_, _ = Bot.Send(m.Sender, msg)
+		_, _ = Bot.Reply(m, msg)
 		return
 	}
 
-	uu := checkinUser(m.Chat.ID)
+	uu := checkinUser(m.Sender.ID)
 
 	msg := fmt.Sprintf("✅ 签到成功\n本次签到获得 %s 流量\n下次签到时间: %s", ByteSize(uu.CheckinTraffic), UnixToStr(uu.NextAt))
-	_, _ = Bot.Send(m.Sender, msg)
+	_, _ = Bot.Reply(m, msg)
 }
 
 func accountCmdCtr(m *tb.Message) {
-	user := QueryUser(m.Chat.ID)
+	log.Printf("checkinCmdCtr req: %+v\n", m)
+	log.Printf("checkinCmdCtr req: %+v\n", m.Chat)
+	user := QueryUser(m.Sender.ID)
 	if user.Id <= 0 {
-		msg := "👀 当前未绑定账户\n请发送 /bind <订阅地址> 绑定账户"
-		_, _ = Bot.Send(m.Sender, msg)
+		msg := "👀 当前未绑定账户\n请私聊发送 /bind <订阅地址> 绑定账户"
+		_, _ = Bot.Reply(m, msg)
 		return
 	}
 	p := QueryPlan(int(user.PlanId))
@@ -102,51 +104,56 @@ func accountCmdCtr(m *tb.Message) {
 	S := ByteSize(user.TransferEnable - (user.U + user.D))
 	if user.PlanId <= 0 {
 		msg := fmt.Sprintf("账户信息概况:\n\n当前绑定账户: %s\n注册时间: %s\n账户余额: %d元\n佣金余额: %d元\n\n当前订阅: 当前暂无订阅计划", Email, CreatedAt, Balance, CommissionBalance)
-		_, _ = Bot.Send(m.Sender, msg)
+		_, _ = Bot.Reply(m, msg)
 		return
 	}
 
 	msg := fmt.Sprintf("账户信息概况:\n\n当前绑定账户: %s\n注册时间: %s\n账户余额: %d元\n佣金余额: %d元\n\n当前订阅: %s\n到期时间: %s\n订阅流量: %s\n已用上行: %s\n已用下行: %s\n剩余可用: %s", Email, CreatedAt, Balance, CommissionBalance, PlanName, ExpiredAt, TransferEnable, U, D, S)
-	_, _ = Bot.Send(m.Sender, msg)
+	_, _ = Bot.Reply(m, msg)
 
 }
 
 func bindCmdCtr(m *tb.Message) {
-	user := QueryUser(m.Chat.ID)
+	if m.Chat.ID < 0 {
+		// _, _ = Bot.Send(m.Chat, "请私聊我命令 /bind <订阅地址>")
+		Bot.Reply(m, "请私聊我命令 /bind <订阅地址>")
+		return
+	}
+	user := QueryUser(m.Sender.ID)
 	if user.Id > 0 {
-		_, _ = Bot.Send(m.Sender, fmt.Sprintf("✅ 当前绑定账户: %s\n若需要修改绑定,需要解绑当前账户。", user.Email))
+		_, _ = Bot.Send(m.Chat, fmt.Sprintf("✅ 当前绑定账户: %s\n若需要修改绑定,需要解绑当前账户。", user.Email))
 		return
 	}
 
 	format := strings.Index(m.Text, "token=")
 	if format <= 0 {
-		_, _ = Bot.Send(m.Sender, "👀 ️账户绑定格式: /bind <订阅地址>")
+		_, _ = Bot.Send(m.Chat, "👀 ️账户绑定格式: /bind <订阅地址>")
 		return
 	}
 
-	b := BindUser(m.Text[format:], m.Chat.ID)
+	b := BindUser(m.Text[format:], m.Sender.ID)
 	if b.Id <= 0 {
-		_, _ = Bot.Send(m.Sender, "❌ 订阅无效,请前往官网复制最新订阅地址!")
+		_, _ = Bot.Send(m.Chat, "❌ 订阅无效,请前往官网复制最新订阅地址!")
 		return
 	}
 
-	if b.TelegramId != uint(m.Chat.ID) {
-		_, _ = Bot.Send(m.Sender, "❌ 账户绑定失败,请稍后再试")
+	if b.TelegramId != uint(m.Sender.ID) {
+		_, _ = Bot.Send(m.Chat, "❌ 账户绑定失败,请稍后再试")
 	}
-	_, _ = Bot.Send(m.Sender, fmt.Sprintf("✅ 账户绑定成功: %s", b.Email))
+	_, _ = Bot.Send(m.Chat, fmt.Sprintf("✅ 账户绑定成功: %s", b.Email))
 }
 
 func unbindCmdCtr(m *tb.Message) {
-	user := unbindUser(m.Chat.ID)
+	user := unbindUser(m.Sender.ID)
 	if user.Id <= 0 {
-		_, _ = Bot.Send(m.Sender, "👀 当前未绑定账户")
+		_, _ = Bot.Reply(m, "👀 当前未绑定账户")
 		return
 	}
 	if user.TelegramId > 0 {
-		_, _ = Bot.Send(m.Sender, "❌ 账户解绑失败,请稍后再试")
+		_, _ = Bot.Reply(m, "❌ 账户解绑失败,请稍后再试")
 		return
 	}
-	_, _ = Bot.Send(m.Sender, "✅ 账户解绑成功")
+	_, _ = Bot.Reply(m, "✅ 账户解绑成功")
 }
 
 func UnixToStr(unix int64) string {
