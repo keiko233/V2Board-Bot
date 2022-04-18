@@ -8,16 +8,17 @@
 
 ## 如何使用它?
 
-下载最新的 release ，找一个文件夹放好（比如 `/usr/UUBot/` ），再在当前文件夹新建一个 `uuBot.yaml` 文件，写上以下内容
+下载最新的 Releases ，找一个文件夹放好（比如 `/usr/UUBot/` ），再在当前文件夹新建一个 `uuBot.yaml` 文件，写上以下内容
 
 ```shell
-# 机器人配置
+# Bot 配置
 bot:
-  # 机器人名称
+  # Bot 名称
   name: ""
   token: ""
-  # 签到可获取的最大值流量，单位是MB
-  byte: 1024
+  # 签到获取的流量，单位是MB
+  max_byte: 1024
+  min_byte: 1024
   
 # 数据库配置
 database:
