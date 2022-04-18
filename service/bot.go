@@ -83,8 +83,6 @@ func checkinCmdCtr(m *tb.Message) {
 }
 
 func accountCmdCtr(m *tb.Message) {
-	log.Printf("checkinCmdCtr req: %+v\n", m)
-	log.Printf("checkinCmdCtr req: %+v\n", m.Chat)
 	user := QueryUser(m.Sender.ID)
 	if user.Id <= 0 {
 		msg := "👀 当前未绑定账户\n请私聊发送 /bind <订阅地址> 绑定账户"
