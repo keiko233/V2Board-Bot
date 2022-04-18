@@ -10,7 +10,7 @@
 
 下载最新的 Releases ，找一个文件夹放好（比如 `/usr/UUBot/` ），再在当前文件夹新建一个 `uuBot.yaml` 文件，写上以下内容
 
-```shell
+```yaml
 # Bot 配置
 bot:
   # Bot 名称
