@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"log"
+	"math"
 	"strings"
 	"time"
 
@@ -60,33 +61,43 @@ func checkinCmdCtr(m *tb.Message) {
 	user := QueryUser(m.Sender.ID)
 	if user.Id <= 0 {
 		msg := "👀 当前未绑定账户\n请发送 /bind <订阅地址> 绑定账户"
-		_, _ = Bot.Reply(m, msg)
+		if _, err := Bot.Reply(m, msg); err != nil {
+			log.Printf("未绑定账户 Bot Reply %s\n", err)
+		}
 		return
 	}
 	if user.PlanId <= 0 {
 		msg := "👀 当前暂无订阅计划,该功能需要订阅后使用～"
-		_, _ = Bot.Reply(m, msg)
+		if _, err := Bot.Reply(m, msg); err != nil {
+			log.Printf("无订阅计划 Bot Reply %s\n", err)
+		}
 		return
 	}
 
 	cc := CheckinTime(m.Sender.ID)
 	if cc == false {
 		msg := fmt.Sprintf("✅ 今天已经签到过啦！明天再来哦～")
-		_, _ = Bot.Reply(m, msg)
+		if _, err := Bot.Reply(m, msg); err != nil {
+			log.Printf("已经签到过 Bot Reply %s\n", err)
+		}
 		return
 	}
 
 	uu := checkinUser(m.Sender.ID)
 
 	msg := fmt.Sprintf("✅ 签到成功\n本次签到获得 %s 流量\n下次签到时间: %s", ByteSize(uu.CheckinTraffic), UnixToStr(uu.NextAt))
-	_, _ = Bot.Reply(m, msg)
+	if _, err := Bot.Reply(m, msg); err != nil {
+		log.Printf("签到成功Bot Reply %s\n", err)
+	}
 }
 
 func accountCmdCtr(m *tb.Message) {
 	user := QueryUser(m.Sender.ID)
 	if user.Id <= 0 {
 		msg := "👀 当前未绑定账户\n请私聊发送 /bind <订阅地址> 绑定账户"
-		_, _ = Bot.Reply(m, msg)
+		if _, err := Bot.Reply(m, msg); err != nil {
+			log.Printf("Bot Reply %s\n", err)
+		}
 		return
 	}
 	p := QueryPlan(int(user.PlanId))
@@ -102,12 +113,16 @@ func accountCmdCtr(m *tb.Message) {
 	S := ByteSize(user.TransferEnable - (user.U + user.D))
 	if user.PlanId <= 0 {
 		msg := fmt.Sprintf("账户信息概况:\n\n当前绑定账户: %s\n注册时间: %s\n账户余额: %d元\n佣金余额: %d元\n\n当前订阅: 当前暂无订阅计划", Email, CreatedAt, Balance, CommissionBalance)
-		_, _ = Bot.Reply(m, msg)
+		if _, err := Bot.Reply(m, msg); err != nil {
+			log.Printf("Bot Reply %s\n", err)
+		}
 		return
 	}
 
 	msg := fmt.Sprintf("账户信息概况:\n\n当前绑定账户: %s\n注册时间: %s\n账户余额: %d元\n佣金余额: %d元\n\n当前订阅: %s\n到期时间: %s\n订阅流量: %s\n已用上行: %s\n已用下行: %s\n剩余可用: %s", Email, CreatedAt, Balance, CommissionBalance, PlanName, ExpiredAt, TransferEnable, U, D, S)
-	_, _ = Bot.Reply(m, msg)
+	if _, err := Bot.Reply(m, msg); err != nil {
+		log.Printf("Bot Reply %s\n", err)
+	}
 
 }
 
@@ -160,15 +175,28 @@ func UnixToStr(unix int64) string {
 }
 
 func ByteSize(size int64) string {
-	if size < 1024 {
-		return fmt.Sprintf("%.2fB", float64(size)/float64(1))
-	} else if size < (1024 * 1024) {
-		return fmt.Sprintf("%.2fKB", float64(size)/float64(1024))
-	} else if size < (1024 * 1024 * 1024) {
-		return fmt.Sprintf("%.2fMB", float64(size)/float64(1024*1024))
-	} else if size < (1024 * 1024 * 1024 * 1024) {
-		return fmt.Sprintf("%.2fGB", float64(size)/float64(1024*1024*1024))
-	} else {
-		return fmt.Sprintf("%.2fTB", float64(size)/float64(1024*1024*1024*1024))
+	sizeFloat := float64(size)
+	oldSize := sizeFloat
+	var n float64 = 0
+	for math.Abs(sizeFloat) >= 1024 {
+		sizeFloat = sizeFloat / 1024
+		n++
 	}
+
+	var k string
+	if n == 0 {
+		k = "B"
+	} else if n == 1 {
+		k = "KB"
+	} else if n == 2 {
+		k = "MB"
+	} else if n == 3 {
+		k = "GB"
+	} else if n == 4 {
+		k = "TB"
+	}
+
+	ns := oldSize / math.Pow(1024, n)
+
+	return fmt.Sprintf("%.2f%s", ns, k)
 }

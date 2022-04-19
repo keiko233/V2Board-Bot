@@ -2,10 +2,12 @@ package service
 
 import (
 	"fmt"
+	"log"
+	"time"
+
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
-	"time"
 )
 
 type User struct {
@@ -72,33 +74,45 @@ func InitDB() (*gorm.DB, error) {
 
 func QueryPlan(planId int) Plan {
 	var plan Plan
-	DB.Where("id = ?", planId).First(&plan)
+	if err := DB.Where("id = ?", planId).First(&plan).Error; err != nil {
+		log.Printf("QueryPlan id = %d error, %s\n", planId, err)
+	}
 	return plan
 }
 
 func QueryUser(tgId int64) User {
 	var user User
-	DB.Where("telegram_id = ?", tgId).First(&user)
+	if err := DB.Where("telegram_id = ?", tgId).First(&user).Error; err != nil {
+		log.Printf("QueryUser tgid = %d error, %s\n", tgId, err)
+	}
 	return user
 }
 
 func BindUser(token string, tgId int64) User {
 	var user User
-	DB.Where("token = ?", token[6:]).First(&user)
+	if err := DB.Where("token = ?", token[6:]).First(&user).Error; err != nil {
+		log.Printf("BindUser Select User By tgid = %d error, %s\n", tgId, err)
+	}
 	if user.Id <= 0 {
 		return user
 	}
 	if user.TelegramId <= 0 {
-		DB.Model(&user).Update("telegram_id", tgId)
+		if err := DB.Model(&user).Update("telegram_id", tgId).Error; err != nil {
+			log.Printf("BindUser Update User By tgid = %d error, %s\n", tgId, err)
+		}
 	}
 	return user
 }
 
 func unbindUser(tgId int64) User {
 	var user User
-	DB.Where("telegram_id = ?", tgId).First(&user)
+	if err := DB.Where("telegram_id = ?", tgId).First(&user).Error; err != nil {
+		log.Printf("unbindUser Select User By tgid = %d error, %s\n", tgId, err)
+	}
 	if user.Id > 0 {
-		DB.Model(&user).Update("telegram_id", nil)
+		if err := DB.Model(&user).Update("telegram_id", nil).Error; err != nil {
+			log.Printf("unbindUser Update User By tgid = %d error, %s\n", tgId, err)
+		}
 		return user
 	}
 	return user
@@ -106,7 +120,9 @@ func unbindUser(tgId int64) User {
 
 func CheckinTime(tgId int64) bool {
 	var uu UUBot
-	DB.Where("telegram_id = ?", tgId).First(&uu)
+	if err := DB.Where("telegram_id = ?", tgId).First(&uu).Error; err != nil {
+		log.Printf("CheckinTime Select User By tgid = %d error, %s\n", tgId, err)
+	}
 	if time.Now().Unix() < uu.NextAt {
 		return false
 	}
@@ -116,8 +132,12 @@ func CheckinTime(tgId int64) bool {
 func checkinUser(tgId int64) UUBot {
 	var user User
 	var uu UUBot
-	DB.Where("telegram_id = ?", tgId).First(&user)
-	DB.Where("telegram_id = ?", tgId).First(&uu)
+	if err := DB.Where("telegram_id = ?", tgId).First(&user).Error; err != nil {
+		log.Printf("checkinUser Select User By tgid = %d error, %s\n", tgId, err)
+	}
+	if err := DB.Where("telegram_id = ?", tgId).First(&uu).Error; err != nil {
+		log.Printf("checkinUser Select UUBot By tgid = %d error, %s\n", tgId, err)
+	}
 
 	b := RandInt(c.Bot.MaxByte, c.Bot.MinByte)
 	CheckIns := b * 1024 * 1024
@@ -131,15 +151,22 @@ func checkinUser(tgId int64) UUBot {
 			NextAt:         time.Now().Unix() + 86400,
 			CheckinTraffic: 0,
 		}
-		DB.Create(&newUU)
+		if err := DB.Create(&newUU).Error; err != nil {
+			log.Printf("checkinUser Create UUBot: %+v error, %s\n", newUU, err)
+		}
+		uu = newUU
 	}
 
-	DB.Model(&uu).Updates(UUBot{
+	if err := DB.Model(&uu).Updates(UUBot{
 		CheckinAt:      time.Now().Unix(),
 		NextAt:         time.Now().Unix() + 86400,
 		CheckinTraffic: CheckIns,
-	})
-	DB.Model(&user).Update("transfer_enable", T)
+	}).Error; err != nil {
+		log.Printf("checkinUser Update UUBot By %+v error, %s\n", uu, err)
+	}
+	if err := DB.Model(&user).Update("transfer_enable", T).Error; err != nil {
+		log.Printf("checkinUser Update User By %+v error, %s\n", user, err)
+	}
 
 	return uu
 }
