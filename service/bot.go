@@ -74,8 +74,7 @@ func checkinCmdCtr(m *tb.Message) {
 		return
 	}
 
-	cc := CheckinTime(m.Sender.ID)
-	if cc == false {
+	if !CheckinTime(m.Sender.ID) {
 		msg := fmt.Sprintf("✅ 今天已经签到过啦！明天再来哦～")
 		if _, err := Bot.Reply(m, msg); err != nil {
 			log.Printf("已经签到过 Bot Reply %s\n", err)

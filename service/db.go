@@ -123,7 +123,9 @@ func CheckinTime(tgId int64) bool {
 	if err := DB.Where("telegram_id = ?", tgId).First(&uu).Error; err != nil {
 		log.Printf("CheckinTime Select User By tgid = %d error, %s\n", tgId, err)
 	}
-	if time.Now().Unix() < uu.NextAt {
+	checkin := time.Unix(uu.CheckinAt, 0)
+	tomorrow, _ := time.ParseInLocation("2006-01-02", checkin.Format("2006-01-02"), time.Local)
+	if tomorrow.AddDate(0, 0, 1).After(time.Now()) {
 		return false
 	}
 	return true
@@ -142,27 +144,27 @@ func checkinUser(tgId int64) UUBot {
 	b := RandInt(c.Bot.MaxByte, c.Bot.MinByte)
 	CheckIns := b * 1024 * 1024
 	T := user.TransferEnable + CheckIns
-
+	checkInAt := time.Now()
+	nextAt, _ := time.ParseInLocation("2006-01-02", checkInAt.Format("2006-01-02"), time.Local)
 	if uu.Id <= 0 {
 		newUU := UUBot{
 			UserId:         user.Id,
 			TelegramId:     user.TelegramId,
-			CheckinAt:      time.Now().Unix(),
-			NextAt:         time.Now().Unix() + 86400,
+			CheckinAt:      checkInAt.Unix(),
+			NextAt:         nextAt.AddDate(0, 0, 1).Unix(),
 			CheckinTraffic: 0,
 		}
 		if err := DB.Create(&newUU).Error; err != nil {
 			log.Printf("checkinUser Create UUBot: %+v error, %s\n", newUU, err)
 		}
-		uu = newUU
-	}
-
-	if err := DB.Model(&uu).Updates(UUBot{
-		CheckinAt:      time.Now().Unix(),
-		NextAt:         time.Now().Unix() + 86400,
-		CheckinTraffic: CheckIns,
-	}).Error; err != nil {
-		log.Printf("checkinUser Update UUBot By %+v error, %s\n", uu, err)
+	} else {
+		if err := DB.Model(&uu).Updates(UUBot{
+			CheckinAt:      checkInAt.Unix(),
+			NextAt:         nextAt.AddDate(0, 0, 1).Unix(),
+			CheckinTraffic: CheckIns,
+		}).Error; err != nil {
+			log.Printf("checkinUser Update UUBot By %+v error, %s\n", uu, err)
+		}
 	}
 	if err := DB.Model(&user).Update("transfer_enable", T).Error; err != nil {
 		log.Printf("checkinUser Update User By %+v error, %s\n", user, err)
