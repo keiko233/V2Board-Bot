@@ -90,7 +90,7 @@ func QueryUser(tgId int64) User {
 
 func BindUser(token string, tgId int64) User {
 	var user User
-	if err := DB.Where("token = ?", token[6:]).First(&user).Error; err != nil {
+	if err := DB.Where("token = ?", token[6:38]).First(&user).Error; err != nil {
 		log.Printf("BindUser Select User By tgid = %d error, %s\n", tgId, err)
 	}
 	if user.Id <= 0 {
