@@ -82,11 +82,16 @@ func checkinCmdCtr(m *tb.Message) {
 		return
 	}
 
-	uu := checkinUser(m.Sender.ID)
+	uu, err := checkinUser(m.Sender.ID)
+	if err != nil {
+		if _, err := Bot.Reply(m, "操作失败！请联系管理员！"); err != nil {
+			log.Printf("操作失败 Bot Reply %s\n", err)
+		}
+	}
 
 	msg := fmt.Sprintf("✅ 签到成功\n本次签到获得 %s 流量\n下次签到时间: %s", ByteSize(uu.CheckinTraffic), UnixToStr(uu.NextAt))
 	if _, err := Bot.Reply(m, msg); err != nil {
-		log.Printf("签到成功Bot Reply %s\n", err)
+		log.Printf("签到成功 Bot Reply %s\n", err)
 	}
 }
 

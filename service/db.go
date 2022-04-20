@@ -122,6 +122,7 @@ func CheckinTime(tgId int64) bool {
 	var uu UUBot
 	if err := DB.Where("telegram_id = ?", tgId).First(&uu).Error; err != nil {
 		log.Printf("CheckinTime Select User By tgid = %d error, %s\n", tgId, err)
+		return true
 	}
 	checkin := time.Unix(uu.CheckinAt, 0)
 	tomorrow, _ := time.ParseInLocation("2006-01-02", checkin.Format("2006-01-02"), time.Local)
@@ -131,11 +132,12 @@ func CheckinTime(tgId int64) bool {
 	return true
 }
 
-func checkinUser(tgId int64) UUBot {
+func checkinUser(tgId int64) (UUBot, error) {
 	var user User
 	var uu UUBot
 	if err := DB.Where("telegram_id = ?", tgId).First(&user).Error; err != nil {
 		log.Printf("checkinUser Select User By tgid = %d error, %s\n", tgId, err)
+		return uu, err
 	}
 	if err := DB.Where("telegram_id = ?", tgId).First(&uu).Error; err != nil {
 		log.Printf("checkinUser Select UUBot By tgid = %d error, %s\n", tgId, err)
@@ -156,6 +158,7 @@ func checkinUser(tgId int64) UUBot {
 		}
 		if err := DB.Create(&newUU).Error; err != nil {
 			log.Printf("checkinUser Create UUBot: %+v error, %s\n", newUU, err)
+			return uu, err
 		}
 	} else {
 		if err := DB.Model(&uu).Updates(UUBot{
@@ -164,11 +167,13 @@ func checkinUser(tgId int64) UUBot {
 			CheckinTraffic: CheckIns,
 		}).Error; err != nil {
 			log.Printf("checkinUser Update UUBot By %+v error, %s\n", uu, err)
+			return uu, err
 		}
 	}
 	if err := DB.Model(&user).Update("transfer_enable", T).Error; err != nil {
 		log.Printf("checkinUser Update User By %+v error, %s\n", user, err)
+		return uu, err
 	}
 
-	return uu
+	return uu, nil
 }
