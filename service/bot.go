@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"strconv"
 	"strings"
 	"time"
 
@@ -34,6 +35,77 @@ func setHandle() {
 	Bot.Handle("/account", accountCmdCtr)
 	Bot.Handle("/bind", bindCmdCtr)
 	Bot.Handle("/unbind", unbindCmdCtr)
+	Bot.Handle("/history", getCheckinHistory)
+
+	Bot.Handle("\fhistory_page", t1)
+}
+
+func t1(q *tb.Callback) {
+	list := strings.Split(q.Data, ":")
+	n, _ := strconv.Atoi(list[0])
+	m, _ := strconv.Atoi(list[1])
+
+	count, out, err := GetCheckLogsByTelegramID(q.Sender.ID, n, 10)
+	if err != nil {
+		_, err = Bot.Reply(q.Message, "获取失败")
+		if err != nil {
+			log.Println("test err", err)
+		}
+		return
+	}
+	var s string
+	s += fmt.Sprintf("当前位于第%d页, 总条数%d, 总页数%d\n---------------\n", n, count, m)
+	for _, i := range out {
+		s += fmt.Sprintf("日期: %s | 获得流量: %s\n", i.CreatedAt.Format("2006-01-02 15:04:05"), ByteSize(i.CheckinTraffic))
+	}
+
+	Bot.Edit(q.Message, s, page(n-1, n+1, m))
+}
+
+func page(perv, next, max int) *tb.ReplyMarkup {
+	r := make([][]tb.InlineButton, 0)
+	r1 := make([]tb.InlineButton, 0)
+	r2 := tb.InlineButton{
+		Unique: "history_page",
+		Data:   strconv.Itoa(perv) + ":" + strconv.Itoa(max),
+		Text:   "上一页",
+	}
+	if perv > 0 {
+		r1 = append(r1, r2)
+	}
+	r2.Data = strconv.Itoa(next) + ":" + strconv.Itoa(max)
+	r2.Text = "下一页"
+	if max != 0 && next < max {
+		r1 = append(r1, r2)
+	}
+	r = append(r, r1)
+	return &tb.ReplyMarkup{
+		InlineKeyboard: r,
+	}
+}
+
+func getCheckinHistory(m *tb.Message) {
+
+	count, out, err := GetCheckLogsByTelegramID(m.Sender.ID, 1, 10)
+	if err != nil {
+		_, err = Bot.Reply(m, "获取失败")
+		if err != nil {
+			log.Println("test err", err)
+		}
+		return
+	}
+
+	max := (count / 10) + 1
+	var s string
+	s += fmt.Sprintf("当前位于第1页, 总条数%d, 总页数%d\n------------------------------------------------------------\n", count, max)
+	for _, i := range out {
+		s += fmt.Sprintf("日期: %s | 获得流量: %s\n", i.CreatedAt.Format("2006-01-02 15:04:05"), ByteSize(i.CheckinTraffic))
+	}
+
+	_, err = Bot.Reply(m, s, page(0, 1, int(max)))
+	if err != nil {
+		log.Println("test err", err)
+	}
 }
 
 func startCmdCtr(m *tb.Message) {
@@ -42,18 +114,21 @@ func startCmdCtr(m *tb.Message) {
 	AccountBtn := menu.Text("🚥‍ 账户信息")
 	BindBtn := menu.Text("😋 绑定账户")
 	UnbindBtn := menu.Text("🤔 解绑账户")
+	historyBtn := menu.Text("📅 签到历史")
 
 	menu.Reply(
 		menu.Row(CheckinBtn, AccountBtn),
 		menu.Row(BindBtn, UnbindBtn),
+		menu.Row(historyBtn),
 	)
 
 	Bot.Handle(&CheckinBtn, checkinCmdCtr)
 	Bot.Handle(&AccountBtn, accountCmdCtr)
 	Bot.Handle(&BindBtn, bindCmdCtr)
 	Bot.Handle(&UnbindBtn, unbindCmdCtr)
+	Bot.Handle(&historyBtn, getCheckinHistory)
 
-	msg := fmt.Sprintf("%s\n为你提供以下服务:\n\n每日签到 /checkin\n账户信息 /account\n绑定账户 /bind\n解绑账户 /unbind", c.Bot.Name)
+	msg := fmt.Sprintf("%s\n为你提供以下服务:\n\n每日签到 /checkin\n账户信息 /account\n绑定账户 /bind\n解绑账户 /unbind\n签到历史 /history", c.Bot.Name)
 	_, _ = Bot.Reply(m, msg, menu)
 }
 

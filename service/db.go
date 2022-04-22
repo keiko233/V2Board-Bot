@@ -39,6 +39,14 @@ type UUBot struct {
 	NextAt         int64
 }
 
+type CheckinLog struct {
+	gorm.Model
+
+	UserID         uint
+	TelegramID     uint
+	CheckinTraffic int64
+}
+
 var DB *gorm.DB
 var c Conf
 
@@ -57,7 +65,7 @@ func InitDB() (*gorm.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("InitDB Open %w", err)
 	}
-	if err = db.AutoMigrate(&UUBot{}); err != nil {
+	if err = db.AutoMigrate(&UUBot{}, &CheckinLog{}); err != nil {
 		return nil, fmt.Errorf("InitDB AutoMigrate %w", err)
 	}
 	sqlDB, err := db.DB()
@@ -148,32 +156,51 @@ func checkinUser(tgId int64) (UUBot, error) {
 	T := user.TransferEnable + CheckIns
 	checkInAt := time.Now()
 	nextAt, _ := time.ParseInLocation("2006-01-02", checkInAt.Format("2006-01-02"), time.Local)
-	if uu.Id <= 0 {
-		newUU := UUBot{
-			UserId:         user.Id,
-			TelegramId:     user.TelegramId,
-			CheckinAt:      checkInAt.Unix(),
-			NextAt:         nextAt.AddDate(0, 0, 1).Unix(),
-			CheckinTraffic: 0,
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		if uu.Id <= 0 {
+			newUU := UUBot{
+				UserId:         user.Id,
+				TelegramId:     user.TelegramId,
+				CheckinAt:      checkInAt.Unix(),
+				NextAt:         nextAt.AddDate(0, 0, 1).Unix(),
+				CheckinTraffic: 0,
+			}
+			if err := tx.Create(&newUU).Error; err != nil {
+				log.Printf("checkinUser Create UUBot: %+v error, %s\n", newUU, err)
+				return err
+			}
+		} else {
+			if err := tx.Model(&uu).Updates(UUBot{
+				CheckinAt:      checkInAt.Unix(),
+				NextAt:         nextAt.AddDate(0, 0, 1).Unix(),
+				CheckinTraffic: CheckIns,
+			}).Error; err != nil {
+				log.Printf("checkinUser Update UUBot By %+v error, %s\n", uu, err)
+				return err
+			}
 		}
-		if err := DB.Create(&newUU).Error; err != nil {
-			log.Printf("checkinUser Create UUBot: %+v error, %s\n", newUU, err)
-			return uu, err
+		if err := tx.Model(&user).Update("transfer_enable", T).Error; err != nil {
+			log.Printf("checkinUser Update User By %+v error, %s\n", user, err)
+			return err
 		}
-	} else {
-		if err := DB.Model(&uu).Updates(UUBot{
-			CheckinAt:      checkInAt.Unix(),
-			NextAt:         nextAt.AddDate(0, 0, 1).Unix(),
+		return tx.Model(&CheckinLog{}).Create(&CheckinLog{
+			UserID:         user.Id,
+			TelegramID:     uint(tgId),
 			CheckinTraffic: CheckIns,
-		}).Error; err != nil {
-			log.Printf("checkinUser Update UUBot By %+v error, %s\n", uu, err)
-			return uu, err
-		}
-	}
-	if err := DB.Model(&user).Update("transfer_enable", T).Error; err != nil {
-		log.Printf("checkinUser Update User By %+v error, %s\n", user, err)
-		return uu, err
-	}
+		}).Error
+	})
 
-	return uu, nil
+	return uu, err
+}
+
+func GetCheckLogsByTelegramID(id int64, pageIndex, pageSize int) (count int64, logs []*CheckinLog, err error) {
+	builder := DB.Model(&CheckinLog{}).Where("telegram_id = ?", id)
+	count, err = Page(builder, pageIndex, pageSize, &logs)
+	return
+}
+
+func Page(db *gorm.DB, pageIndex, pageSize int, out interface{}) (int64, error) {
+	var count int64
+	err := db.Offset((pageIndex - 1) * pageSize).Limit(pageSize).Find(out).Count(&count).Error
+	return count, err
 }
