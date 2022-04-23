@@ -233,7 +233,7 @@ func IsChinese(str string) bool {
 func (img *Image) SetTableText(ss [][]string) {
 	for i := 1; i <= img.t.h; i++ {
 		ths := img.t.hblock(i)
-		for j := 0; j < len(ths); j++ {
+		for j := 0; j < len(ss[i-1]); j++ {
 			img.DrawText(ss[i-1][j], ths[j].fromx+10, ths[j].fromy+(img.t.vsize/2+10))
 		}
 	}
@@ -243,6 +243,8 @@ type TableData struct {
 	HSize int
 	VSize int
 	L     [][]string
+
+	MinV int
 
 	FontPath  string
 	FontSize  float64
@@ -254,6 +256,7 @@ func NewDefaultTable(ss [][]string, font string) (*Image, error) {
 	t := TableData{
 		HSize:     300,
 		VSize:     50,
+		MinV:      6,
 		FontPath:  font,
 		FontSize:  10,
 		FontDPI:   200,
@@ -267,6 +270,9 @@ func NewDefaultTable(ss [][]string, font string) (*Image, error) {
 func Table(t TableData) (*Image, error) {
 	h := len(t.L)
 	v := len(t.L[0])
+	if v < t.MinV {
+		v = t.MinV
+	}
 	img := NewTable(h, v, t.HSize, t.VSize)
 	img.SetFontColor(t.FontColor)
 	err := img.SetFont(t.FontPath, t.FontSize, t.FontDPI)
