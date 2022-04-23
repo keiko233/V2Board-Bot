@@ -50,11 +50,8 @@ type CheckinLog struct {
 var DB *gorm.DB
 var c Conf
 
-func init() {
-	c.GetConfig()
-}
-
 func InitDB() (*gorm.DB, error) {
+	c.GetConfig()
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%v)/%s?charset=utf8mb4&parseTime=True&loc=Local", c.Database.Username, c.Database.Password, c.Database.Host, c.Database.Port, c.Database.Name)
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
 		NamingStrategy: schema.NamingStrategy{

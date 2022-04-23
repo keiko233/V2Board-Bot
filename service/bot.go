@@ -1,7 +1,9 @@
 package service
 
 import (
+	"bytes"
 	"fmt"
+	"image/png"
 	"log"
 	"math"
 	"strconv"
@@ -46,20 +48,36 @@ func t1(q *tb.Callback) {
 	m, _ := strconv.Atoi(list[1])
 
 	count, out, err := GetCheckLogsByTelegramID(q.Sender.ID, n, 10)
+	s := fmt.Sprintf("当前位于第%d页, 总条数%d, 总页数%d", n, count, m)
+	ss := make([][]string, 0)
+	s1 := make([]string, 0)
+	s2 := make([]string, 0)
+	s1 = append(s1, "签到时间")
+	s2 = append(s2, "获得流量")
+	for _, i := range out {
+		s1 = append(s1, i.CreatedAt.Format("2006-01-02 15:04:05"))
+		s2 = append(s2, ByteSize(i.CheckinTraffic))
+	}
+	ss = append(ss, s1, s2)
+	img, err := NewDefaultTable(ss, "/usr/UUBot/微软雅黑.ttf")
 	if err != nil {
-		_, err = Bot.Reply(q.Message, "获取失败")
-		if err != nil {
-			log.Println("test err", err)
-		}
+		log.Println("test2 err", err)
+		Bot.Reply(q.Message, "生成图片失败")
 		return
 	}
-	var s string
-	s += fmt.Sprintf("当前位于第%d页, 总条数%d, 总页数%d\n---------------\n", n, count, m)
-	for _, i := range out {
-		s += fmt.Sprintf("日期: %s | 获得流量: %s\n", i.CreatedAt.Format("2006-01-02 15:04:05"), ByteSize(i.CheckinTraffic))
+	var b []byte
+	bf := bytes.NewBuffer(b)
+	err = png.Encode(bf, img.GetImage())
+	if err != nil {
+		log.Println("test3 err", err)
+		_, err = Bot.Reply(q.Message, "生成图片失败")
+		return
 	}
-
-	Bot.Edit(q.Message, s, page(n-1, n+1, m))
+	log.Println("try edit")
+	Bot.Edit(q.Message, &tb.Photo{
+		File:    tb.FromReader(bf),
+		Caption: s,
+	}, page(n-1, n+1, m))
 }
 
 func page(perv, next, max int) *tb.ReplyMarkup {
@@ -96,13 +114,39 @@ func getCheckinHistory(m *tb.Message) {
 	}
 
 	max := (count / 10) + 1
-	var s string
-	s += fmt.Sprintf("当前位于第1页, 总条数%d, 总页数%d\n------------------------------------------------------------\n", count, max)
+	s := fmt.Sprintf("当前位于第1页, 总条数%d, 总页数%d", count, max)
+	ss := make([][]string, 0)
+	s1 := make([]string, 0)
+	s2 := make([]string, 0)
+	s1 = append(s1, "签到时间")
+	s2 = append(s2, "获得流量")
 	for _, i := range out {
-		s += fmt.Sprintf("日期: %s | 获得流量: %s\n", i.CreatedAt.Format("2006-01-02 15:04:05"), ByteSize(i.CheckinTraffic))
+		s1 = append(s1, i.CreatedAt.Format("2006-01-02 15:04:05"))
+		s2 = append(s2, ByteSize(i.CheckinTraffic))
+	}
+	ss = append(ss, s1, s2)
+	img, err := NewDefaultTable(ss, "/usr/UUBot/微软雅黑.ttf")
+	if err != nil {
+		log.Println("test2 err", err)
+		Bot.Reply(m, "生成图片失败")
+		return
 	}
 
-	_, err = Bot.Reply(m, s, page(0, 1, int(max)))
+	var b []byte
+	bf := bytes.NewBuffer(b)
+	err = png.Encode(bf, img.GetImage())
+	if err != nil {
+		_, err = Bot.Reply(m, "生成图片失败")
+		if err != nil {
+			log.Println("test3 err", err)
+		}
+		return
+	}
+	log.Println("try reply")
+	_, err = Bot.Reply(m, &tb.Photo{
+		File:    tb.FromReader(bf),
+		Caption: s,
+	}, page(0, 1, int(max)))
 	if err != nil {
 		log.Println("test err", err)
 	}
