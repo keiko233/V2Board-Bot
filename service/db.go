@@ -198,6 +198,6 @@ func GetCheckLogsByTelegramID(id int64, pageIndex, pageSize int) (count int64, l
 
 func Page(db *gorm.DB, pageIndex, pageSize int, out interface{}) (int64, error) {
 	var count int64
-	err := db.Offset((pageIndex - 1) * pageSize).Limit(pageSize).Find(out).Count(&count).Error
+	err := db.Offset((pageIndex - 1) * pageSize).Limit(pageSize).Find(out).Offset(-1).Limit(-1).Count(&count).Error
 	return count, err
 }

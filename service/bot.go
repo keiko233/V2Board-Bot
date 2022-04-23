@@ -47,7 +47,12 @@ func t1(q *tb.Callback) {
 	n, _ := strconv.Atoi(list[0])
 	m, _ := strconv.Atoi(list[1])
 
-	count, out, err := GetCheckLogsByTelegramID(q.Sender.ID, n, 10)
+	count, out, err := GetCheckLogsByTelegramID(q.Sender.ID, n, 5)
+	if err != nil {
+		log.Println("test2 err", err)
+		Bot.Reply(q.Message, "获取失败")
+		return
+	}
 	s := fmt.Sprintf("当前位于第%d页, 总条数%d, 总页数%d", n, count, m)
 	ss := make([][]string, 0)
 	s1 := make([]string, 0)
@@ -73,7 +78,6 @@ func t1(q *tb.Callback) {
 		_, err = Bot.Reply(q.Message, "生成图片失败")
 		return
 	}
-	log.Println("try edit")
 	Bot.Edit(q.Message, &tb.Photo{
 		File:    tb.FromReader(bf),
 		Caption: s,
@@ -93,7 +97,7 @@ func page(perv, next, max int) *tb.ReplyMarkup {
 	}
 	r2.Data = strconv.Itoa(next) + ":" + strconv.Itoa(max)
 	r2.Text = "下一页"
-	if max != 0 && next < max {
+	if max != 0 && next <= max {
 		r1 = append(r1, r2)
 	}
 	r = append(r, r1)
@@ -104,7 +108,7 @@ func page(perv, next, max int) *tb.ReplyMarkup {
 
 func getCheckinHistory(m *tb.Message) {
 
-	count, out, err := GetCheckLogsByTelegramID(m.Sender.ID, 1, 10)
+	count, out, err := GetCheckLogsByTelegramID(m.Sender.ID, 1, 5)
 	if err != nil {
 		_, err = Bot.Reply(m, "获取失败")
 		if err != nil {
@@ -113,7 +117,7 @@ func getCheckinHistory(m *tb.Message) {
 		return
 	}
 
-	max := (count / 10) + 1
+	max := (count / 5) + 1
 	s := fmt.Sprintf("当前位于第1页, 总条数%d, 总页数%d", count, max)
 	ss := make([][]string, 0)
 	s1 := make([]string, 0)
@@ -142,11 +146,11 @@ func getCheckinHistory(m *tb.Message) {
 		}
 		return
 	}
-	log.Println("try reply")
+
 	_, err = Bot.Reply(m, &tb.Photo{
 		File:    tb.FromReader(bf),
 		Caption: s,
-	}, page(0, 1, int(max)))
+	}, page(0, 2, int(max)))
 	if err != nil {
 		log.Println("test err", err)
 	}
