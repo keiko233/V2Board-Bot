@@ -36,7 +36,7 @@ func unbindUser(tgId int64) (notfound bool, err error) {
 
 func CheckinTime(tgId int64) (todayNotCheckin bool, err error) {
 
-	log, notfound, err := GetLatestCheckLogByTelegramID(tgId)
+	l, notfound, err := GetLatestCheckLogByTelegramID(tgId)
 	if err != nil {
 		return false, err
 	}
@@ -44,11 +44,11 @@ func CheckinTime(tgId int64) (todayNotCheckin bool, err error) {
 		return true, nil
 	}
 
-	tomorrow, _ := time.ParseInLocation("2006-01-02", log.CreatedAt.Format("2006-01-02"), time.Local)
-	if tomorrow.AddDate(0, 0, 1).After(time.Now()) {
-		return true, nil
+	checkDay, err := time.ParseInLocation("2006-01-02", l.CreatedAt.Format("2006-01-02"), time.Local)
+	if err != nil {
+		return false, err
 	}
-	return false, nil
+	return checkDay.AddDate(0, 0, 1).Before(time.Now()), nil
 }
 
 func checkinUser(tgId int64) (log *CheckinLog, err error) {
