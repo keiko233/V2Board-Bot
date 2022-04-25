@@ -181,14 +181,19 @@ func startCmdCtr(m *tb.Message) {
 }
 
 func checkinCmdCtr(m *tb.Message) {
-	user := QueryUser(m.Sender.ID)
-	if user.Id <= 0 {
-		msg := "👀 当前未绑定账户\n请发送 /bind <订阅地址> 绑定账户"
-		if _, err := Bot.Reply(m, msg); err != nil {
-			log.Printf("未绑定账户 Bot Reply %s\n", err)
-		}
+	user, notfound, err := GetUserByTelegramID(m.Sender.ID)
+
+	if err != nil {
+		log.Printf("QueryUser tgid = %d error, %s\n", m.Sender.ID, err)
+		Bot.Reply(m, "👀 获取失败，请稍后重试或联系管理员")
 		return
 	}
+
+	if notfound {
+		Bot.Reply(m, "👀 当前未绑定账户\n请私聊发送 /bind <订阅地址> 绑定账户")
+		return
+	}
+
 	if user.PlanId <= 0 {
 		msg := "👀 当前暂无订阅计划,该功能需要订阅后使用～"
 		if _, err := Bot.Reply(m, msg); err != nil {
@@ -196,8 +201,13 @@ func checkinCmdCtr(m *tb.Message) {
 		}
 		return
 	}
-
-	if !CheckinTime(m.Sender.ID) {
+	todayNotCheckin, err := CheckinTime(m.Sender.ID)
+	if err != nil {
+		log.Printf("CheckinTime err %s\n", err)
+		Bot.Reply(m, "👀 获取失败，请稍后重试或联系管理员")
+		return
+	}
+	if !todayNotCheckin {
 		msg := fmt.Sprintf("✅ 今天已经签到过啦！明天再来哦～")
 		if _, err := Bot.Reply(m, msg); err != nil {
 			log.Printf("已经签到过 Bot Reply %s\n", err)
@@ -205,29 +215,47 @@ func checkinCmdCtr(m *tb.Message) {
 		return
 	}
 
-	uu, err := checkinUser(m.Sender.ID)
+	l,  err := checkinUser(m.Sender.ID)
 	if err != nil {
+		log.Printf("操作失败 %s\n", err)
 		if _, err := Bot.Reply(m, "操作失败！请联系管理员！"); err != nil {
 			log.Printf("操作失败 Bot Reply %s\n", err)
 		}
+		return
 	}
 
-	msg := fmt.Sprintf("✅ 签到成功\n本次签到获得 %s 流量\n下次签到时间: %s", ByteSize(uu.CheckinTraffic), UnixToStr(uu.NextAt))
+	msg := fmt.Sprintf("✅ 签到成功\n本次签到获得 %s 流量\n签到次数每日0点刷新，明天再来哦！", ByteSize(l.CheckinTraffic))
 	if _, err := Bot.Reply(m, msg); err != nil {
 		log.Printf("签到成功 Bot Reply %s\n", err)
 	}
 }
 
 func accountCmdCtr(m *tb.Message) {
-	user := QueryUser(m.Sender.ID)
-	if user.Id <= 0 {
-		msg := "👀 当前未绑定账户\n请私聊发送 /bind <订阅地址> 绑定账户"
-		if _, err := Bot.Reply(m, msg); err != nil {
-			log.Printf("Bot Reply %s\n", err)
-		}
+	user, notfound, err := GetUserByTelegramID(m.Sender.ID)
+
+	if err != nil {
+		log.Printf("QueryUser tgid = %d error, %s\n", m.Sender.ID, err)
+		Bot.Reply(m, "👀 获取失败，请稍后重试或联系管理员")
 		return
 	}
-	p := QueryPlan(int(user.PlanId))
+
+	if notfound {
+		Bot.Reply(m, "👀 当前未绑定账户\n请私聊发送 /bind <订阅地址> 绑定账户")
+		return
+	}
+
+	p, notfound, err := GetPlanByID(int(user.PlanId))
+	if err != nil {
+		log.Printf("QueryPlan id = %d error, %s\n", user.PlanId, err)
+		Bot.Reply(m, "👀 获取失败，请稍后重试或联系管理员")
+		return
+	}
+
+	if notfound {
+		Bot.Reply(m, "👀 订阅套餐不存在，请稍后重试或联系管理员")
+		return
+	}
+
 	Email := user.Email
 	CreatedAt := UnixToStr(user.CreatedAt)
 	Balance := user.Balance / 100
@@ -255,45 +283,49 @@ func accountCmdCtr(m *tb.Message) {
 
 func bindCmdCtr(m *tb.Message) {
 	if m.Chat.ID < 0 {
-		// _, _ = Bot.Send(m.Chat, "请私聊我命令 /bind <订阅地址>")
 		Bot.Reply(m, "请私聊我命令 /bind <订阅地址>")
 		return
 	}
-	user := QueryUser(m.Sender.ID)
-	if user.Id > 0 {
-		_, _ = Bot.Send(m.Chat, fmt.Sprintf("✅ 当前绑定账户: %s\n若需要修改绑定,需要解绑当前账户。", user.Email))
+	user, notfound, err := GetUserByTelegramID(m.Sender.ID)
+	if err != nil {
+		log.Printf("QueryUser tgid = %d error, %s\n", m.Sender.ID, err)
+		Bot.Reply(m, "👀 获取失败，请稍后重试或联系管理员")
+		return
+	}
+	if !notfound {
+		Bot.Send(m.Chat, fmt.Sprintf("✅ 当前绑定账户: %s\n若需要修改绑定,需要解绑当前账户。", user.Email))
 		return
 	}
 
 	format := strings.Index(m.Text, "token=")
 	if format <= 0 {
-		_, _ = Bot.Send(m.Chat, "👀 ️账户绑定格式: /bind <订阅地址>")
+		Bot.Send(m.Chat, "👀 ️账户绑定格式: /bind <订阅地址>")
 		return
 	}
 
-	b := BindUser(m.Text[format:], m.Sender.ID)
-	if b.Id <= 0 {
-		_, _ = Bot.Send(m.Chat, "❌ 订阅无效,请前往官网复制最新订阅地址!")
+	user, err = BindUser(m.Text[format:][6:38], m.Sender.ID)
+	if err != nil {
+		log.Printf("Bind User token=%s and tgid=%d err %s\n", m.Text[6:38], m.Sender.ID, err)
+		Bot.Send(m.Chat, "❌ 订阅无效,请前往官网复制最新订阅地址!")
 		return
 	}
-
-	if b.TelegramId != uint(m.Sender.ID) {
-		_, _ = Bot.Send(m.Chat, "❌ 账户绑定失败,请稍后再试")
-	}
-	_, _ = Bot.Send(m.Chat, fmt.Sprintf("✅ 账户绑定成功: %s", b.Email))
+	Bot.Send(m.Chat, fmt.Sprintf("✅ 账户绑定成功: %s", user.Email))
 }
 
 func unbindCmdCtr(m *tb.Message) {
-	user := unbindUser(m.Sender.ID)
-	if user.Id <= 0 {
-		_, _ = Bot.Reply(m, "👀 当前未绑定账户")
+	notfound, err := unbindUser(m.Sender.ID)
+	if err != nil {
+		log.Printf("unbind user by tgid=%d error %s\n", m.Sender.ID, err)
+		Bot.Reply(m, "❌ 账户解绑失败,请稍后再试")
 		return
 	}
-	if user.TelegramId > 0 {
-		_, _ = Bot.Reply(m, "❌ 账户解绑失败,请稍后再试")
+
+	if notfound {
+		Bot.Reply(m, "👀 当前未绑定账户")
 		return
 	}
-	_, _ = Bot.Reply(m, "✅ 账户解绑成功")
+
+	Bot.Reply(m, "✅ 账户解绑成功")
 }
 
 func UnixToStr(unix int64) string {
