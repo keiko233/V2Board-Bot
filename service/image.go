@@ -8,8 +8,6 @@ import (
 
 	"github.com/golang/freetype"
 	"golang.org/x/image/font"
-	// "golang.org/x/image/font/basicfont"
-	// "golang.org/x/image/math/fixed"
 )
 
 var (
@@ -327,17 +325,6 @@ func NewTable(h, v, hsize, vsize int) *Image {
 func (img *Image) GetImage() *image.NRGBA {
 	return img.i
 }
-
-// func (img *Image) SetFontColor(color color.Color) {
-// 	img.d.Src = image.NewUniform(color)
-// }
-
-// func (img *Image) DrawText(x, y int, text string) {
-// 	img.d.Dst = img.i
-// 	img.d.Face = basicfont.Face7x13
-// 	img.d.Dot = fixed.Point26_6{X: fixed.I(x), Y: fixed.I(y)}
-// 	img.d.DrawString(text)
-// }
 
 func (img *Image) SetFontColor(color color.Color) {
 	img.f.SetSrc(image.NewUniform(color))

@@ -46,8 +46,9 @@ func t1(q *tb.Callback) {
 	list := strings.Split(q.Data, ":")
 	n, _ := strconv.Atoi(list[0])
 	m, _ := strconv.Atoi(list[1])
+	id, _ := strconv.Atoi(list[2])
 
-	count, out, err := GetCheckLogsByTelegramID(q.Sender.ID, n, 5)
+	count, out, err := GetCheckLogsByTelegramID(int64(id), n, 5)
 	if err != nil {
 		log.Println("test2 err", err)
 		Bot.Reply(q.Message, "获取失败")
@@ -81,21 +82,21 @@ func t1(q *tb.Callback) {
 	Bot.Edit(q.Message, &tb.Photo{
 		File:    tb.FromReader(bf),
 		Caption: s,
-	}, page(n-1, n+1, m))
+	}, page(n-1, n+1, m, id))
 }
 
-func page(perv, next, max int) *tb.ReplyMarkup {
+func page(perv, next, max, id int) *tb.ReplyMarkup {
 	r := make([][]tb.InlineButton, 0)
 	r1 := make([]tb.InlineButton, 0)
 	r2 := tb.InlineButton{
 		Unique: "history_page",
-		Data:   strconv.Itoa(perv) + ":" + strconv.Itoa(max),
+		Data:   strconv.Itoa(perv) + ":" + strconv.Itoa(max) + ":" + strconv.Itoa(id),
 		Text:   "上一页",
 	}
 	if perv > 0 {
 		r1 = append(r1, r2)
 	}
-	r2.Data = strconv.Itoa(next) + ":" + strconv.Itoa(max)
+	r2.Data = strconv.Itoa(next) + ":" + strconv.Itoa(max) + ":" + strconv.Itoa(id)
 	r2.Text = "下一页"
 	if max != 0 && next <= max {
 		r1 = append(r1, r2)
@@ -118,6 +119,9 @@ func getCheckinHistory(m *tb.Message) {
 	}
 
 	max := (count / 5) + 1
+	if count == 5 {
+		max = 1
+	}
 	s := fmt.Sprintf("当前位于第1页, 总条数%d, 总页数%d", count, max)
 	ss := make([][]string, 0)
 	s1 := make([]string, 0)
@@ -150,7 +154,7 @@ func getCheckinHistory(m *tb.Message) {
 	_, err = Bot.Reply(m, &tb.Photo{
 		File:    tb.FromReader(bf),
 		Caption: s,
-	}, page(0, 2, int(max)))
+	}, page(0, 2, int(max), int(m.Sender.ID)))
 	if err != nil {
 		log.Println("test err", err)
 	}
@@ -215,7 +219,7 @@ func checkinCmdCtr(m *tb.Message) {
 		return
 	}
 
-	l,  err := checkinUser(m.Sender.ID)
+	l, err := checkinUser(m.Sender.ID)
 	if err != nil {
 		log.Printf("操作失败 %s\n", err)
 		if _, err := Bot.Reply(m, "操作失败！请联系管理员！"); err != nil {
