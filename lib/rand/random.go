@@ -1,4 +1,4 @@
-package service
+package rand
 
 import (
 	"math/rand"
