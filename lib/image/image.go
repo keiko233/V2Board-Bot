@@ -7,7 +7,6 @@ import (
 	"unicode"
 
 	"github.com/golang/freetype"
-	"golang.org/x/image/font"
 )
 
 var (
@@ -166,7 +165,6 @@ var (
 type Image struct {
 	i *image.NRGBA
 	f *freetype.Context
-	d *font.Drawer
 
 	fontSize float64
 	t        table
@@ -229,6 +227,10 @@ func IsChinese(str string) bool {
 }
 
 func (img *Image) SetTableText(ss [][]string) {
+	// 设置绘制矩阵大小
+	img.f.SetClip(img.i.Bounds())
+	//设置输出的图片
+	img.f.SetDst(img.i)
 	for i := 1; i <= img.t.h; i++ {
 		ths := img.t.hblock(i)
 		for j := 0; j < len(ss[i-1]); j++ {
@@ -244,41 +246,78 @@ type TableData struct {
 
 	MinV int
 
+	img *Image
+
 	FontPath  string
 	FontSize  float64
 	FontDPI   float64
 	FontColor color.Color
 }
 
-func NewDefaultTable(ss [][]string, font string) (*Image, error) {
-	t := TableData{
-		HSize:     300,
-		VSize:     50,
-		MinV:      6,
-		FontPath:  font,
-		FontSize:  10,
-		FontDPI:   200,
-		FontColor: Burlywood,
-		L:         ss,
-	}
+var dt *TableData
 
-	return Table(t)
-}
-
-func Table(t TableData) (*Image, error) {
+func (t *TableData) Init() error {
 	h := len(t.L)
 	v := len(t.L[0])
-	if v < t.MinV {
-		v = t.MinV
+	if v < dt.MinV {
+		v = dt.MinV
 	}
-	img := NewTable(h, v, t.HSize, t.VSize)
-	img.SetFontColor(t.FontColor)
-	err := img.SetFont(t.FontPath, t.FontSize, t.FontDPI)
+	t.img = NewImage()
+	t.NewI(h, v)
+	t.img.SetFontColor(t.FontColor)
+	err := t.img.SetFont(t.FontPath, t.FontSize, t.FontDPI)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	img.SetTableText(t.L)
-	return img, nil
+	return nil
+}
+
+func (t *TableData) NewI(h, v int) {
+	t.img.NewI(h, v, dt.HSize, dt.VSize)
+}
+
+func NewDefaultTable(ss [][]string, font string) (*Image, error) {
+	if dt == nil {
+		dt = &TableData{
+			HSize:     300,
+			VSize:     50,
+			MinV:      6,
+			FontPath:  font,
+			FontSize:  10,
+			FontDPI:   200,
+			FontColor: Burlywood,
+			L:         ss,
+		}
+		if err := dt.Init(); err != nil {
+			dt = nil
+			return nil, err
+		}
+	}
+
+	if len(ss) != len(dt.L) || len(ss[0]) != len(dt.L[0]) {
+		h := len(ss)
+		v := len(ss[0])
+		if v < dt.MinV {
+			v = dt.MinV
+		}
+		dt.NewI(h, v)
+	}
+
+	dt.L = ss
+
+	dt.img.DrawTable()
+	dt.img.SetTableText(ss)
+	return dt.img, nil
+}
+
+func (img *Image) NewI(h, v, hsize, vsize int) {
+	img.i = image.NewNRGBA(image.Rect(0, 0, h*hsize, v*vsize))
+	img.t = table{
+		h:     h,
+		v:     v,
+		hsize: hsize,
+		vsize: vsize,
+	}
 }
 
 // h: 多少列
@@ -290,7 +329,6 @@ func NewTable(h, v, hsize, vsize int) *Image {
 	img := &Image{
 		i: image.NewNRGBA(image.Rect(0, 0, h*hsize, v*vsize)),
 		f: freetype.NewContext(),
-		d: &font.Drawer{},
 		t: table{
 			h:     h,
 			v:     v,
@@ -298,10 +336,21 @@ func NewTable(h, v, hsize, vsize int) *Image {
 			vsize: vsize,
 		},
 	}
+	img.DrawTable()
+	return img
+}
+
+func NewImage() *Image {
+	return &Image{
+		f: freetype.NewContext(),
+	}
+}
+
+func (img *Image) DrawTable() {
 	var c color.Color
 	var n int
 
-	for j := 0; j <= v*vsize; j += vsize {
+	for j := 0; j <= img.t.v*img.t.vsize; j += img.t.vsize {
 		if n%2 == 0 {
 			c = Whitesmoke
 		} else {
@@ -311,15 +360,14 @@ func NewTable(h, v, hsize, vsize int) *Image {
 			c = BlueGreyDarken_1
 		}
 		n++
-		img.SetBlock(c, 0, img.i.Rect.Dx(), j, j+vsize)
+		img.SetBlock(c, 0, img.i.Rect.Dx(), j, j+img.t.vsize)
 	}
-	for i := 0; i <= h*hsize; i += hsize {
+	for i := 0; i <= img.t.h*img.t.hsize; i += img.t.hsize {
 		if i != 0 {
-			img.SetVerLine(BlueGreyDarken_4, 0, vsize, i)
-			img.SetVerLine(Whitesmoke, vsize, img.i.Rect.Dy(), i)
+			img.SetVerLine(BlueGreyDarken_4, 0, img.t.vsize, i)
+			img.SetVerLine(Whitesmoke, img.t.vsize, img.i.Rect.Dy(), i)
 		}
 	}
-	return img
 }
 
 func (img *Image) GetImage() *image.NRGBA {
@@ -353,11 +401,6 @@ func (img *Image) SetFont(fontPath string, size, dpi float64) error {
 
 	//设置分辨率
 	img.f.SetDPI(dpi)
-	// 设置绘制矩阵大小
-	img.f.SetClip(img.i.Bounds())
-
-	//设置输出的图片
-	img.f.SetDst(img.i)
 
 	return nil
 }

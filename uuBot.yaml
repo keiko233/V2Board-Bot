@@ -6,6 +6,7 @@ bot:
   # 签到可获取的最大值流量，单位是MB 1024 为 最多1GB
   max_byte: 1024
   min_byte: 0
+  font: "./微软雅黑.ttf" #字体路径，只支持ttf
   
 # 数据库配置
 database:

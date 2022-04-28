@@ -11,23 +11,36 @@ import (
 	"github.com/keiko233/V2Board-Bot/dao"
 	"github.com/keiko233/V2Board-Bot/lib/image"
 	"github.com/keiko233/V2Board-Bot/model"
+	"github.com/keiko233/V2Board-Bot/service"
 	"github.com/keiko233/V2Board-Bot/utils"
 	tb "gopkg.in/tucnak/telebot.v2"
 )
 
-func HistoryQuery(q *tb.Callback) {
+func GetCheckinHistory(m *tb.Message) {
+	history(m, int(m.Sender.ID), 1, false)
+}
+
+func HistoryCallback(q *tb.Callback) {
 	list := strings.Split(q.Data, ":")
 	n, _ := strconv.Atoi(list[0])
-	m, _ := strconv.Atoi(list[1])
 	id, _ := strconv.Atoi(list[2])
+	history(q.Message, id, n, true)
+}
 
+func history(m *tb.Message, id, n int, isCallBack bool) {
 	count, out, err := dao.GetCheckLogsByTelegramID(int64(id), n, 5)
 	if err != nil {
 		log.Println("test2 err", err)
-		model.Bot.Reply(q.Message, "获取失败")
+		model.Bot.Reply(m, "获取失败")
 		return
 	}
-	s := fmt.Sprintf("当前位于第%d页, 总条数%d, 总页数%d", n, count, m)
+
+	max := count / 5
+	if count%5 != 0 {
+		max += 1
+	}
+
+	s := fmt.Sprintf("当前位于第%d页, 总条数%d, 总页数%d", n, count, max)
 	ss := make([][]string, 0)
 	s1 := make([]string, 0)
 	s2 := make([]string, 0)
@@ -38,10 +51,10 @@ func HistoryQuery(q *tb.Callback) {
 		s2 = append(s2, utils.ByteSize(i.CheckinTraffic))
 	}
 	ss = append(ss, s1, s2)
-	img, err := image.NewDefaultTable(ss, "/usr/UUBot/微软雅黑.ttf")
+	img, err := image.NewDefaultTable(ss, model.Config.Bot.Font)
 	if err != nil {
 		log.Println("test2 err", err)
-		model.Bot.Reply(q.Message, "生成图片失败")
+		model.Bot.Reply(m, "生成图片失败")
 		return
 	}
 	var b []byte
@@ -49,16 +62,24 @@ func HistoryQuery(q *tb.Callback) {
 	err = png.Encode(bf, img.GetImage())
 	if err != nil {
 		log.Println("test3 err", err)
-		_, err = model.Bot.Reply(q.Message, "生成图片失败")
+		_, err = model.Bot.Reply(m, "生成图片失败")
 		return
 	}
-	model.Bot.Edit(q.Message, &tb.Photo{
-		File:    tb.FromReader(bf),
-		Caption: s,
-	}, page(n-1, n+1, m, id))
+
+	if isCallBack {
+		model.Bot.Edit(m, &tb.Photo{
+			File:    tb.FromReader(bf),
+			Caption: s,
+		}, historyPage(n-1, n+1, int(max), id))
+	} else {
+		model.Bot.Reply(m, &tb.Photo{
+			File:    tb.FromReader(bf),
+			Caption: s,
+		}, historyPage(n-1, n+1, int(max), id))
+	}
 }
 
-func page(perv, next, max, id int) *tb.ReplyMarkup {
+func historyPage(perv, next, max, id int) *tb.ReplyMarkup {
 	r := make([][]tb.InlineButton, 0)
 	r1 := make([]tb.InlineButton, 0)
 	r2 := tb.InlineButton{
@@ -80,55 +101,97 @@ func page(perv, next, max, id int) *tb.ReplyMarkup {
 	}
 }
 
-func GetCheckinHistory(m *tb.Message) {
+func Report(m *tb.Message) {
+	report(m, model.DailyReport, false)
+}
 
-	count, out, err := dao.GetCheckLogsByTelegramID(m.Sender.ID, 1, 5)
+func ReportCallback(c *tb.Callback) {
+	report(c.Message, model.ReportType(c.Data), true)
+}
+
+func report(m *tb.Message, r model.ReportType, isCallBack bool) {
+	report, notfound, start, end, err := service.Report(r)
 	if err != nil {
-		_, err = model.Bot.Reply(m, "获取失败")
-		if err != nil {
-			log.Println("test err", err)
+		log.Printf("操作失败 %s\n", err)
+		if _, err := model.Bot.Reply(m, "操作失败！请联系管理员！"); err != nil {
+			log.Printf("操作失败 Bot Reply %s\n", err)
 		}
 		return
 	}
 
-	max := (count / 5) + 1
-	if count == 5 {
-		max = 1
-	}
-	s := fmt.Sprintf("当前位于第1页, 总条数%d, 总页数%d", count, max)
-	ss := make([][]string, 0)
-	s1 := make([]string, 0)
-	s2 := make([]string, 0)
-	s1 = append(s1, "签到时间")
-	s2 = append(s2, "获得流量")
-	for _, i := range out {
-		s1 = append(s1, i.CreatedAt.Format("2006-01-02 15:04:05"))
-		s2 = append(s2, utils.ByteSize(i.CheckinTraffic))
-	}
-	ss = append(ss, s1, s2)
-	img, err := image.NewDefaultTable(ss, "/usr/UUBot/微软雅黑.ttf")
-	if err != nil {
-		log.Println("test2 err", err)
-		model.Bot.Reply(m, "生成图片失败")
+	if notfound {
+		model.Bot.Reply(m, "今天还没有人签到哦~")
 		return
 	}
 
-	var b []byte
-	bf := bytes.NewBuffer(b)
-	err = png.Encode(bf, img.GetImage())
+	max, err := model.Bot.ChatMemberOf(m.Chat, &tb.User{ID: report.MaxUser})
 	if err != nil {
-		_, err = model.Bot.Reply(m, "生成图片失败")
-		if err != nil {
-			log.Println("test3 err", err)
+		log.Println("bot ChatMemberOf err", err)
+		model.Bot.Reply(m, "操作失败！请联系管理员！")
+		return
+	}
+
+	min, err := model.Bot.ChatMemberOf(m.Chat, &tb.User{ID: report.MinUser})
+	if err != nil {
+		log.Println("bot ChatMemberOf err", err)
+		model.Bot.Reply(m, "操作失败！请联系管理员！")
+		return
+	}
+
+	msg := fmt.Sprintf("%s: \n\n统计时间: \n开始: %s\n结束: %s\n\n签到总流量: %s\n\n欧皇: %s\n@%s\n获得: %s\n\n非酋: %s\n@%s\n获得: %s",
+		checkReportType(r),
+		start.Format("2006-01-02 15:04:05"),
+		end.Format("2006-01-02 15:04:05"),
+		utils.ByteSize(report.Sum),
+		max.User.FirstName+max.User.LastName,
+		max.User.Username,
+		utils.ByteSize(report.Max),
+		min.User.FirstName+min.User.LastName,
+		min.User.Username,
+		utils.ByteSize(report.Min),
+	)
+	if isCallBack {
+		model.Bot.Edit(m, msg, reportBtn(r))
+	} else {
+
+		model.Bot.Reply(m, msg, reportBtn(r))
+	}
+}
+
+func reportBtn(t model.ReportType) *tb.ReplyMarkup {
+
+	ss := make([]model.ReportType, 0, 3)
+	ss = append(ss, model.DailyReport)
+	ss = append(ss, model.WeeklyReport)
+	ss = append(ss, model.MonthlyReport)
+
+	r := make([][]tb.InlineButton, 0)
+	r1 := make([]tb.InlineButton, 0)
+	r2 := tb.InlineButton{
+		Unique: "report_btn",
+	}
+	for _, i := range ss {
+		if i == t {
+			continue
 		}
-		return
+		r2.Data = string(i)
+		r2.Text = checkReportType(i)
+		r1 = append(r1, r2)
 	}
 
-	_, err = model.Bot.Reply(m, &tb.Photo{
-		File:    tb.FromReader(bf),
-		Caption: s,
-	}, page(0, 2, int(max), int(m.Sender.ID)))
-	if err != nil {
-		log.Println("test err", err)
+	return &tb.ReplyMarkup{
+		InlineKeyboard: append(r, r1),
 	}
+}
+
+func checkReportType(t model.ReportType) string {
+	switch t {
+	case model.DailyReport:
+		return "本日汇报"
+	case model.WeeklyReport:
+		return "本周汇报"
+	case model.MonthlyReport:
+		return "本月汇报"
+	}
+	return ""
 }

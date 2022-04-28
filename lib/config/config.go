@@ -14,7 +14,7 @@ func GetConfig(path string) (c *model.Conf) {
 	if err != nil {
 		log.Fatalf("打开配置文件错误...\n错误信息:%s", err)
 	}
-	if err = yaml.Unmarshal(yamlFile, c); err != nil {
+	if err = yaml.Unmarshal(yamlFile, &c); err != nil {
 		log.Fatalf("配置文件解析错误... \n错误信息:%s", err)
 	}
 

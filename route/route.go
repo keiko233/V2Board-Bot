@@ -30,5 +30,15 @@ func setHandle(bot *tb.Bot) {
 	bot.Handle("/bind", controller.BindCmdCtr)
 	bot.Handle("/unbind", controller.UnbindCmdCtr)
 	bot.Handle("/history", controller.GetCheckinHistory)
-	bot.Handle("\fhistory_page", controller.HistoryQuery)
+	bot.Handle("\fhistory_page", controller.HistoryCallback)
+	bot.Handle("/report", controller.Report)
+	bot.Handle("\freport_btn", controller.ReportCallback)
+
+	bot.Handle(model.MenuCheckinBtn, controller.CheckinCmdCtr)
+	bot.Handle(model.MenuAccountBtn, controller.AccountCmdCtr)
+	bot.Handle(model.MenuBindBtn, controller.BindCmdCtr)
+	bot.Handle(model.MenuUnbindBtn, controller.UnbindCmdCtr)
+	bot.Handle(model.MenuhistoryBtn, controller.GetCheckinHistory)
+	bot.Handle(model.MenureportBtn, controller.Report)
+
 }

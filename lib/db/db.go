@@ -7,6 +7,7 @@ import (
 	"github.com/keiko233/V2Board-Bot/model"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 	"gorm.io/gorm/schema"
 )
 
@@ -17,6 +18,7 @@ func InitDB(c model.DatabaseConf) (*gorm.DB, error) {
 			TablePrefix:   "v2_",
 			SingularTable: true,
 		},
+		Logger: logger.Default.LogMode(logger.Error),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("InitDB Open %w", err)

@@ -2,6 +2,7 @@ package dao
 
 import (
 	"errors"
+	"time"
 
 	"github.com/keiko233/V2Board-Bot/model"
 	"gorm.io/gorm"
@@ -104,4 +105,39 @@ func Page(db *gorm.DB, pageIndex, pageSize int, out interface{}) (int64, error) 
 	var count int64
 	err := db.Offset((pageIndex - 1) * pageSize).Limit(pageSize).Find(out).Offset(-1).Limit(-1).Count(&count).Error
 	return count, err
+}
+
+func GetReportByTime(start, end time.Time) (report *model.Report, notfound bool, err error) {
+	report = new(model.Report)
+	builder := model.DB.Where("created_at >= ?", start).Where("created_at < ?", end)
+
+	err = NewSession(builder).Model(&model.CheckinLog{}).Select("SUM(checkin_traffic) AS sum").Scan(&report.Sum).Error
+	notfound, err = IsNotFound(err)
+	if err != nil || notfound {
+		return
+	}
+
+	type sum struct {
+		T  int64
+		ID int64
+	}
+	sumList := make([]sum, 0)
+
+	err = NewSession(builder).Model(&model.CheckinLog{}).Group("telegram_id").Select("SUM(checkin_traffic) as t, telegram_id as id").Order("t DESC").Find(&sumList).Error
+	notfound, err = IsNotFound(err)
+	if err != nil || notfound {
+		return
+	}
+
+	report.Max = sumList[0].T
+	report.MaxUser = sumList[0].ID
+
+	report.Min = sumList[len(sumList)-1].T
+	report.MinUser = sumList[len(sumList)-1].ID
+
+	return
+}
+
+func NewSession(builder *gorm.DB) *gorm.DB {
+	return builder.Session(&gorm.Session{})
 }
