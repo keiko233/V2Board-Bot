@@ -18,7 +18,7 @@ func InitDB(c model.DatabaseConf) (*gorm.DB, error) {
 			TablePrefix:   "v2_",
 			SingularTable: true,
 		},
-		Logger: logger.Default.LogMode(logger.Info),
+		Logger: logger.Default.LogMode(logger.Error),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("InitDB Open %w", err)
