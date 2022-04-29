@@ -109,7 +109,18 @@ func Page(db *gorm.DB, pageIndex, pageSize int, out interface{}) (int64, error) 
 
 func GetReportByTime(start, end time.Time) (report *model.Report, notfound bool, err error) {
 	report = new(model.Report)
-	builder := model.DB.Where("created_at >= ?", start).Where("created_at < ?", end)
+	builder := model.DB.Where("created_at >= ?", start.Format("2006-01-02 15:04:05")).Where("created_at < ?", end.Format("2006-01-02 15:04:05"))
+
+	err = NewSession(builder).Model(&model.CheckinLog{}).Count(&report.UserCount).Error
+	notfound, err = IsNotFound(err)
+	if err != nil || notfound {
+		return
+	}
+
+	if report.UserCount <= 0 {
+		notfound = true
+		return
+	}
 
 	err = NewSession(builder).Model(&model.CheckinLog{}).Select("SUM(checkin_traffic) AS sum").Scan(&report.Sum).Error
 	notfound, err = IsNotFound(err)

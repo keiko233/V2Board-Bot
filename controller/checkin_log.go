@@ -113,36 +113,40 @@ func report(m *tb.Message, r model.ReportType, isCallBack bool) {
 	report, notfound, start, end, err := service.Report(r)
 	if err != nil {
 		log.Printf("操作失败 %s\n", err)
-		if _, err := model.Bot.Reply(m, "操作失败！请联系管理员！"); err != nil {
-			log.Printf("操作失败 Bot Reply %s\n", err)
-		}
+		msg := "操作失败！请联系管理员！"
+		reply(isCallBack, m, msg, reportBtn(r))
 		return
 	}
 
 	if notfound {
-		model.Bot.Reply(m, "今天还没有人签到哦~")
+		log.Printf("report: %+v\n", report)
+		msg := "今天还没有人签到哦~"
+		reply(isCallBack, m, msg, reportBtn(r))
 		return
 	}
 
 	max, err := model.Bot.ChatMemberOf(m.Chat, &tb.User{ID: report.MaxUser})
 	if err != nil {
 		log.Println("bot ChatMemberOf err", err)
-		model.Bot.Reply(m, "操作失败！请联系管理员！")
+		msg := "操作失败！请联系管理员！"
+		reply(isCallBack, m, msg, reportBtn(r))
 		return
 	}
 
 	min, err := model.Bot.ChatMemberOf(m.Chat, &tb.User{ID: report.MinUser})
 	if err != nil {
 		log.Println("bot ChatMemberOf err", err)
-		model.Bot.Reply(m, "操作失败！请联系管理员！")
+		msg := "操作失败！请联系管理员！"
+		reply(isCallBack, m, msg, reportBtn(r))
 		return
 	}
 
-	msg := fmt.Sprintf("%s: \n\n统计时间: \n开始: %s\n结束: %s\n\n签到总流量: %s\n\n欧皇: %s\n@%s\n获得: %s\n\n非酋: %s\n@%s\n获得: %s",
+	msg := fmt.Sprintf("%s: \n\n统计时间: \n开始: %s\n结束: %s\n\n签到总流量: %s\n签到总次数: %d\n\n欧皇: %s\n@%s\n获得: %s\n\n非酋: %s\n@%s\n获得: %s",
 		checkReportType(r),
 		start.Format("2006-01-02 15:04:05"),
 		end.Format("2006-01-02 15:04:05"),
 		utils.ByteSize(report.Sum),
+		report.UserCount,
 		max.User.FirstName+max.User.LastName,
 		max.User.Username,
 		utils.ByteSize(report.Max),
@@ -150,11 +154,15 @@ func report(m *tb.Message, r model.ReportType, isCallBack bool) {
 		min.User.Username,
 		utils.ByteSize(report.Min),
 	)
-	if isCallBack {
-		model.Bot.Edit(m, msg, reportBtn(r))
-	} else {
 
-		model.Bot.Reply(m, msg, reportBtn(r))
+	reply(isCallBack, m, msg, reportBtn(r))
+}
+
+func reply(isCallback bool, to *tb.Message, what interface{}, options ...interface{}) (*tb.Message, error) {
+	if isCallback {
+		return model.Bot.Edit(to, what, options...)
+	} else {
+		return model.Bot.Reply(to, what, options...)
 	}
 }
 
