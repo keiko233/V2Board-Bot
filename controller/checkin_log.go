@@ -30,7 +30,14 @@ func HistoryCallback(q *tb.Callback) {
 func history(m *tb.Message, id, n int, isCallBack bool) {
 	count, out, err := dao.GetCheckLogsByTelegramID(int64(id), n, 5)
 	if err != nil {
-		log.Println("test2 err", err)
+		log.Println("history GetCheckLogsByTelegramID err", err)
+		model.Bot.Reply(m, "获取失败")
+		return
+	}
+
+	sum, _, err := dao.GetCheckinLogsTrafficSumByTelegramID(int64(id))
+	if err != nil {
+		log.Println("history GetCheckinLogsTrafficSumByTelegramID err", err)
 		model.Bot.Reply(m, "获取失败")
 		return
 	}
@@ -40,7 +47,7 @@ func history(m *tb.Message, id, n int, isCallBack bool) {
 		max += 1
 	}
 
-	s := fmt.Sprintf("当前位于第%d页, 总条数%d, 总页数%d", n, count, max)
+	s := fmt.Sprintf("当前位于第%d页, 总条数%d, 总页数%d, 总签到流量%s", n, count, max, utils.ByteSize(sum))
 	ss := make([][]string, 0)
 	s1 := make([]string, 0)
 	s2 := make([]string, 0)
