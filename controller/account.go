@@ -37,6 +37,10 @@ func AccountCmdCtr(m *tb.Message) {
 	}
 
 	Email := user.Email
+	if m.Chat.ID <= 0 {
+		Email = "不可以偷窥哦~~"
+	}
+
 	CreatedAt := utils.UnixToStr(user.CreatedAt)
 	Balance := user.Balance / 100
 	CommissionBalance := user.CommissionBalance / 100

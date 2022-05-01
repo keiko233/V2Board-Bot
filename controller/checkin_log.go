@@ -124,21 +124,34 @@ func report(m *tb.Message, r model.ReportType, isCallBack bool) {
 		reply(isCallBack, m, msg, reportBtn(r))
 		return
 	}
+	var max, min *tb.ChatMember
+	if m.Chat.ID > 0 {
+		max = new(tb.ChatMember)
+		max.User = new(tb.User)
+		max.User.Username = "null"
+		max.User.FirstName = "匿名"
 
-	max, err := model.Bot.ChatMemberOf(m.Chat, &tb.User{ID: report.MaxUser})
-	if err != nil {
-		log.Println("bot ChatMemberOf err", err)
-		msg := "操作失败！请联系管理员！"
-		reply(isCallBack, m, msg, reportBtn(r))
-		return
-	}
+		min = new(tb.ChatMember)
+		min.User = new(tb.User)
+		min.User.Username = "null"
+		min.User.FirstName = "匿名"
+	} else {
 
-	min, err := model.Bot.ChatMemberOf(m.Chat, &tb.User{ID: report.MinUser})
-	if err != nil {
-		log.Println("bot ChatMemberOf err", err)
-		msg := "操作失败！请联系管理员！"
-		reply(isCallBack, m, msg, reportBtn(r))
-		return
+		max, err = model.Bot.ChatMemberOf(m.Chat, &tb.User{ID: report.MaxUser})
+		if err != nil {
+			log.Println("bot ChatMemberOf err", err)
+			msg := "操作失败！请联系管理员！"
+			reply(isCallBack, m, msg, reportBtn(r))
+			return
+		}
+
+		min, err = model.Bot.ChatMemberOf(m.Chat, &tb.User{ID: report.MinUser})
+		if err != nil {
+			log.Println("bot ChatMemberOf err", err)
+			msg := "操作失败！请联系管理员！"
+			reply(isCallBack, m, msg, reportBtn(r))
+			return
+		}
 	}
 
 	msg := fmt.Sprintf("%s: \n\n统计时间: \n开始: %s\n结束: %s\n\n签到总流量: %s\n签到总次数: %d\n\n欧皇: %s\n@%s\n获得: %s\n\n非酋: %s\n@%s\n获得: %s",
