@@ -8,38 +8,38 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/keiko233/V2Board-Bot/common"
 	"github.com/keiko233/V2Board-Bot/dao"
 	"github.com/keiko233/V2Board-Bot/lib/image"
+	"github.com/keiko233/V2Board-Bot/lib/tgbot"
 	"github.com/keiko233/V2Board-Bot/model"
 	"github.com/keiko233/V2Board-Bot/service"
 	"github.com/keiko233/V2Board-Bot/utils"
 	tb "gopkg.in/tucnak/telebot.v2"
 )
 
-func GetCheckinHistory(m *tb.Message) {
-	history(m, int(m.Sender.ID), 1, false)
+func CheckinHistory(ctx *tgbot.Context) error {
+	return history(ctx, int(ctx.Message.Sender.ID), 1)
 }
 
-func HistoryCallback(q *tb.Callback) {
-	list := strings.Split(q.Data, ":")
+func CheckinHistoryCallback(ctx *tgbot.Context) error {
+	list := strings.Split(ctx.Callback.Data, ":")
 	n, _ := strconv.Atoi(list[0])
 	id, _ := strconv.Atoi(list[2])
-	history(q.Message, id, n, true)
+	return history(ctx, id, n)
 }
 
-func history(m *tb.Message, id, n int, isCallBack bool) {
+func history(ctx *tgbot.Context, id, n int) error {
 	count, out, err := dao.GetCheckLogsByTelegramID(int64(id), n, 5)
 	if err != nil {
 		log.Println("history GetCheckLogsByTelegramID err", err)
-		model.Bot.Reply(m, "获取失败")
-		return
+		return err
 	}
 
 	sum, _, err := dao.GetCheckinLogsTrafficSumByTelegramID(int64(id))
 	if err != nil {
 		log.Println("history GetCheckinLogsTrafficSumByTelegramID err", err)
-		model.Bot.Reply(m, "获取失败")
-		return
+		return err
 	}
 
 	max := count / 5
@@ -60,30 +60,27 @@ func history(m *tb.Message, id, n int, isCallBack bool) {
 	ss = append(ss, s1, s2)
 	img, err := image.NewDefaultTable(ss, model.Config.Bot.Font)
 	if err != nil {
-		log.Println("test2 err", err)
-		model.Bot.Reply(m, "生成图片失败")
-		return
+		return err
 	}
 	var b []byte
 	bf := bytes.NewBuffer(b)
 	err = png.Encode(bf, img.GetImage())
 	if err != nil {
-		log.Println("test3 err", err)
-		_, err = model.Bot.Reply(m, "生成图片失败")
-		return
+		return err
 	}
 
-	if isCallBack {
-		model.Bot.Edit(m, &tb.Photo{
-			File:    tb.FromReader(bf),
-			Caption: s,
-		}, historyPage(n-1, n+1, int(max), id))
-	} else {
-		model.Bot.Reply(m, &tb.Photo{
+	if ctx.IsCallback() {
+		return ctx.Edit(&tb.Photo{
 			File:    tb.FromReader(bf),
 			Caption: s,
 		}, historyPage(n-1, n+1, int(max), id))
 	}
+
+	return ctx.Reply(&tb.Photo{
+		File:    tb.FromReader(bf),
+		Caption: s,
+	}, historyPage(n-1, n+1, int(max), id))
+
 }
 
 func historyPage(perv, next, max, id int) *tb.ReplyMarkup {
@@ -108,31 +105,25 @@ func historyPage(perv, next, max, id int) *tb.ReplyMarkup {
 	}
 }
 
-func Report(m *tb.Message) {
-	report(m, model.DailyReport, false)
+func Report(ctx *tgbot.Context) error {
+	return report(ctx, model.DailyReport)
 }
 
-func ReportCallback(c *tb.Callback) {
-	report(c.Message, model.ReportType(c.Data), true)
+func ReportCallback(ctx *tgbot.Context) error {
+	return report(ctx, model.ReportType(ctx.Callback.Data))
 }
 
-func report(m *tb.Message, r model.ReportType, isCallBack bool) {
+func report(ctx *tgbot.Context, r model.ReportType) error {
 	report, notfound, start, end, err := service.Report(r)
 	if err != nil {
-		log.Printf("操作失败 %s\n", err)
-		msg := "操作失败！请联系管理员！"
-		reply(isCallBack, m, msg, reportBtn(r))
-		return
+		return err
 	}
 
 	if notfound {
-		log.Printf("report: %+v\n", report)
-		msg := "今天还没有人签到哦~"
-		reply(isCallBack, m, msg, reportBtn(r))
-		return
+		return common.ErrNotFoundCheckinUsers
 	}
 	var max, min *tb.ChatMember
-	if m.Chat.ID > 0 {
+	if ctx.Message.Chat.ID > 0 {
 		max = new(tb.ChatMember)
 		max.User = new(tb.User)
 		max.User.Username = "null"
@@ -143,21 +134,16 @@ func report(m *tb.Message, r model.ReportType, isCallBack bool) {
 		min.User.Username = "null"
 		min.User.FirstName = "匿名"
 	} else {
-
-		max, err = model.Bot.ChatMemberOf(m.Chat, &tb.User{ID: report.MaxUser})
+		max, err = ctx.ChatMemberOf(report.MaxUser)
 		if err != nil {
 			log.Println("bot ChatMemberOf err", err)
-			msg := "操作失败！请联系管理员！"
-			reply(isCallBack, m, msg, reportBtn(r))
-			return
+			return err
 		}
 
-		min, err = model.Bot.ChatMemberOf(m.Chat, &tb.User{ID: report.MinUser})
+		min, err = ctx.ChatMemberOf(report.MinUser)
 		if err != nil {
 			log.Println("bot ChatMemberOf err", err)
-			msg := "操作失败！请联系管理员！"
-			reply(isCallBack, m, msg, reportBtn(r))
-			return
+			return err
 		}
 	}
 
@@ -175,14 +161,14 @@ func report(m *tb.Message, r model.ReportType, isCallBack bool) {
 		utils.ByteSize(report.Min),
 	)
 
-	reply(isCallBack, m, msg, reportBtn(r))
+	return reply(ctx, msg, reportBtn(r))
 }
 
-func reply(isCallback bool, to *tb.Message, what interface{}, options ...interface{}) (*tb.Message, error) {
-	if isCallback {
-		return model.Bot.Edit(to, what, options...)
+func reply(ctx *tgbot.Context, what interface{}, options ...interface{}) error {
+	if ctx.IsCallback() {
+		return ctx.Edit(what, options...)
 	} else {
-		return model.Bot.Reply(to, what, options...)
+		return ctx.Reply(what, options...)
 	}
 }
 

@@ -1,44 +1,42 @@
 package route
 
 import (
-	"log"
-	"time"
-
+	"github.com/keiko233/V2Board-Bot/common"
 	"github.com/keiko233/V2Board-Bot/controller"
+	"github.com/keiko233/V2Board-Bot/lib/tgbot"
 	"github.com/keiko233/V2Board-Bot/model"
-	tb "gopkg.in/tucnak/telebot.v2"
 )
 
-func Start() {
-	bot, err := tb.NewBot(tb.Settings{
-		URL:    "https://api.telegram.org",
-		Token:  model.Config.Bot.Token,
-		Poller: &tb.LongPoller{Timeout: 10 * time.Second},
-	})
+func Init() error {
+	engine, err := tgbot.NewDefaultEngine(model.Config.Bot.Token)
 	if err != nil {
-		log.Fatalf("Bot 启动失败啦...... \n当前Token [ %s ] \n错误信息:  %s", model.Config.Bot.Token, err)
+		return err
 	}
-	model.Bot = bot
-	setHandle(bot)
-	bot.Start()
+
+	route := engine.Use(handleErr)
+	{
+		route.Handle(controller.Help, "/help")
+		route.Handle(controller.Checkin, "/checkin", model.MenuCheckinBtn)
+		route.Handle(controller.Bind, "/bind", model.MenuBindBtn)
+		route.Handle(controller.Unbind, "/unbind", model.MenuUnbindBtn)
+		route.Handle(controller.Account, "/account", model.MenuAccountBtn)
+
+		route.Handle(controller.Report, "/report", model.MenuReportBtn)
+		route.HandleCallback(controller.ReportCallback, "report_btn")
+
+		route.Handle(controller.CheckinHistory, "/history", model.MenuhistoryBtn)
+		route.HandleCallback(controller.CheckinHistoryCallback, "history_page")
+	}
+
+	route.Run()
+	return nil
 }
 
-func setHandle(bot *tb.Bot) {
-	bot.Handle("/help", controller.StartCmdCtr)
-	bot.Handle("/checkin", controller.CheckinCmdCtr)
-	bot.Handle("/account", controller.AccountCmdCtr)
-	bot.Handle("/bind", controller.BindCmdCtr)
-	bot.Handle("/unbind", controller.UnbindCmdCtr)
-	bot.Handle("/history", controller.GetCheckinHistory)
-	bot.Handle("\fhistory_page", controller.HistoryCallback)
-	bot.Handle("/report", controller.Report)
-	bot.Handle("\freport_btn", controller.ReportCallback)
-
-	bot.Handle(model.MenuCheckinBtn, controller.CheckinCmdCtr)
-	bot.Handle(model.MenuAccountBtn, controller.AccountCmdCtr)
-	bot.Handle(model.MenuBindBtn, controller.BindCmdCtr)
-	bot.Handle(model.MenuUnbindBtn, controller.UnbindCmdCtr)
-	bot.Handle(model.MenuhistoryBtn, controller.GetCheckinHistory)
-	bot.Handle(model.MenureportBtn, controller.Report)
-
+func handleErr(h tgbot.HandleFunc) tgbot.HandleFunc {
+	return func(c *tgbot.Context) error {
+		if err := h(c); err != nil {
+			common.ErrorResult(c, err)
+		}
+		return nil
+	}
 }

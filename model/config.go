@@ -1,13 +1,11 @@
 package model
 
 import (
-	tb "gopkg.in/tucnak/telebot.v2"
 	"gorm.io/gorm"
 )
 
 var DB *gorm.DB
 var Config *Conf
-var Bot *tb.Bot
 
 var (
 	MenuCheckinBtn = "👀 每日签到"
@@ -15,7 +13,7 @@ var (
 	MenuBindBtn    = "😋 绑定账户"
 	MenuUnbindBtn  = "🤔 解绑账户"
 	MenuhistoryBtn = "📅 签到历史"
-	MenureportBtn  = "📊 数据统计"
+	MenuReportBtn  = "📊 数据统计"
 )
 
 type Conf struct {

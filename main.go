@@ -24,5 +24,7 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	route.Start()
+	if err := route.Init(); err != nil {
+		log.Fatalln(err)
+	}
 }
