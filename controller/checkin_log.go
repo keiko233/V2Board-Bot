@@ -122,29 +122,23 @@ func report(ctx *tgbot.Context, r model.ReportType) error {
 	if notfound {
 		return common.ErrNotFoundCheckinUsers
 	}
-	var max, min *tb.ChatMember
-	if ctx.Message.Chat.ID > 0 {
+
+	max, err := ctx.ChatMemberOf(report.MaxUser)
+	if err != nil {
+		log.Println("bot ChatMemberOf err", err)
 		max = new(tb.ChatMember)
 		max.User = new(tb.User)
 		max.User.Username = "null"
 		max.User.FirstName = "匿名"
+	}
 
+	min, err := ctx.ChatMemberOf(report.MinUser)
+	if err != nil {
+		log.Println("bot ChatMemberOf err", err)
 		min = new(tb.ChatMember)
 		min.User = new(tb.User)
 		min.User.Username = "null"
 		min.User.FirstName = "匿名"
-	} else {
-		max, err = ctx.ChatMemberOf(report.MaxUser)
-		if err != nil {
-			log.Println("bot ChatMemberOf err", err)
-			return err
-		}
-
-		min, err = ctx.ChatMemberOf(report.MinUser)
-		if err != nil {
-			log.Println("bot ChatMemberOf err", err)
-			return err
-		}
 	}
 
 	msg := fmt.Sprintf("%s: \n\n统计时间: \n开始: %s\n结束: %s\n\n签到总流量: %s\n签到总次数: %d\n\n欧皇: %s\n@%s\n获得: %s\n\n非酋: %s\n@%s\n获得: %s",
