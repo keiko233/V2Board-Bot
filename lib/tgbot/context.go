@@ -13,6 +13,18 @@ func (c *Context) Reply(msg interface{}, options ...interface{}) error {
 	return err
 }
 
+func (c *Context) ReplyTo(to *tb.Message, msg interface{}, options ...interface{}) error {
+	_, err := c.bot.Reply(to, msg, options...)
+	return err
+}
+
+func (c *Context) AnswerCallback(msg string) error {
+	return c.bot.Respond(c.Callback, &tb.CallbackResponse{
+		Text:      msg,
+		ShowAlert: true,
+	})
+}
+
 func (c *Context) Send(to tb.Recipient, msg interface{}, options ...interface{}) error {
 	_, err := c.bot.Send(to, msg, options...)
 	return err

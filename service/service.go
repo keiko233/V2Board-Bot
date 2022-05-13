@@ -1,10 +1,11 @@
 package service
 
 import (
+	"log"
 	"time"
 
+	"github.com/keiko233/V2Board-Bot/common"
 	"github.com/keiko233/V2Board-Bot/dao"
-	"github.com/keiko233/V2Board-Bot/lib/rand"
 	"github.com/keiko233/V2Board-Bot/model"
 	"gorm.io/gorm"
 )
@@ -15,8 +16,8 @@ func BindUser(token string, tgId int64) (*model.User, error) {
 		return nil, err
 	}
 
-	if user.TelegramId != 0 {
-		return user, nil
+	if user.TelegramId != uint(tgId) && user.TelegramId != 0 {
+		return nil, common.ErrBindAlready
 	}
 
 	err = dao.UpdateUser(nil, user, "telegram_id", tgId)
@@ -37,6 +38,17 @@ func UnbindUser(tgId int64) (notfound bool, err error) {
 	return false, err
 }
 
+func UnbindToken(token string) (notfound bool, err error) {
+	log.Printf("force unbind token %s", token)
+	user, notfound, err := dao.GetUserByToken(nil, token)
+	if err != nil || notfound {
+		return notfound, err
+	}
+	user.TelegramId = 0
+	err = dao.Save(nil, user)
+	return
+}
+
 func CheckinTime(tgId int64) (todayNotCheckin bool, err error) {
 
 	l, notfound, err := dao.GetLatestCheckLogByTelegramID(tgId)
@@ -54,14 +66,12 @@ func CheckinTime(tgId int64) (todayNotCheckin bool, err error) {
 	return checkDay.AddDate(0, 0, 1).Before(time.Now()), nil
 }
 
-func CheckinUser(tgId int64) (log *model.CheckinLog, err error) {
+func CheckinUser(tgId, b int64, f model.FortuneType) (log *model.CheckinLog, err error) {
 
 	user, err := dao.MustGetUserByTelegramID(nil, tgId)
 	if err != nil {
 		return nil, err
 	}
-
-	b := rand.RandInt(model.Config.Bot.MaxByte, model.Config.Bot.MinByte)
 	checkIns := b * 1024 * 1024
 	oldTraffic := user.TransferEnable
 	newTraffic := user.TransferEnable + checkIns
@@ -75,6 +85,7 @@ func CheckinUser(tgId int64) (log *model.CheckinLog, err error) {
 			CheckinTraffic: checkIns,
 			OldTraffic:     oldTraffic,
 			NewTraffic:     newTraffic,
+			Fortune:        f,
 		}
 		return tx.Model(&model.CheckinLog{}).Create(log).Error
 	})

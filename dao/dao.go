@@ -89,6 +89,14 @@ func Update(db *gorm.DB, m interface{}) error {
 	return conn.Model(&m).Updates(m).Error
 }
 
+func Save(db *gorm.DB, m interface{}) error {
+	conn := model.DB
+	if db != nil {
+		conn = db
+	}
+	return conn.Save(m).Error
+}
+
 func GetLatestCheckLogByTelegramID(id int64) (log *model.CheckinLog, notfound bool, err error) {
 	err = model.DB.Model(&model.CheckinLog{}).Where("telegram_id = ?", id).Order("created_at DESC").First(&log).Error
 	notfound, err = IsNotFound(err)

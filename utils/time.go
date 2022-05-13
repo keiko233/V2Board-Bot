@@ -7,6 +7,11 @@ func UnixToStr(unix int64) string {
 	return u
 }
 
+func TodayStart() time.Time {
+	start, _ := time.Parse("2006-01-02", time.Now().Format("2006-01-02"))
+	return start
+}
+
 func Today() (start, end time.Time) {
 	start, _ = time.Parse("2006-01-02", time.Now().Format("2006-01-02"))
 	end = start.AddDate(0, 0, 1).Add(-1 * time.Second)

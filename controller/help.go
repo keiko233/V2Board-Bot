@@ -27,6 +27,6 @@ func Help(ctx *tgbot.Context) error {
 
 	menu.Reply(menuList...)
 
-	msg := fmt.Sprintf("%s\n为你提供以下服务:\n\n每日签到 /checkin\n账户信息 /account\n绑定账户 /bind\n解绑账户 /unbind\n签到历史 /history\n签到统计 /report\n请注意, 绑定账号和解绑账号需要私聊我哦~", model.Config.Bot.Name)
+	msg := fmt.Sprintf("%s\n为你提供以下服务:\n\n每日签到 /checkin\n账户信息 /account\n绑定账户 /bind\n解绑账户 /unbind\n强制解绑账号 /unbind <订阅链接>\n签到历史 /history\n签到统计 /report\n请注意, 绑定账号和解绑账号需要私聊我哦~", model.Config.Bot.Name)
 	return ctx.Reply(msg, menu)
 }

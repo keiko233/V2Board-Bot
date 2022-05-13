@@ -17,5 +17,6 @@ const (
 	ErrMustPrivateChat      ErrorMsg = "👀 请私聊我命令哦~~"
 	ErrBindFormatError      ErrorMsg = "👀 ️账户绑定格式: /bind <订阅地址>"
 	ErrBindTokenInvalid     ErrorMsg = "❌ 订阅无效,请前往官网复制最新订阅地址!"
+	ErrBindAlready          ErrorMsg = "❌ 该账号已被其他用户绑定, 请先解绑!"
 	ErrInvalidPlan          ErrorMsg = "👀 订阅套餐不存在，请稍后重试或联系管理员"
 )

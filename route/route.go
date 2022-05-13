@@ -16,11 +16,14 @@ func Init() error {
 	route := engine.Use(handleErr)
 	{
 		route.Handle(controller.Help, "/help")
-		route.Handle(controller.Checkin, "/checkin", model.MenuCheckinBtn)
 		route.Handle(controller.Bind, "/bind", model.MenuBindBtn)
 		route.Handle(controller.Unbind, "/unbind", model.MenuUnbindBtn)
 		route.Handle(controller.Account, "/account", model.MenuAccountBtn)
 
+		route.Handle(controller.Fortune, "/checkin", model.MenuCheckinBtn)
+		route.HandleCallback(controller.Checkin, "checkin")
+		route.HandleCallback(controller.PassPool, "passpool")
+		
 		route.Handle(controller.Report, "/report", model.MenuReportBtn)
 		route.HandleCallback(controller.ReportCallback, "report_btn")
 

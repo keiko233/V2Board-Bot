@@ -1,11 +1,13 @@
 package model
 
 import (
+	"github.com/keiko233/V2Board-Bot/lib/cache"
 	"gorm.io/gorm"
 )
 
 var DB *gorm.DB
 var Config *Conf
+var Cache cache.Cache
 
 var (
 	MenuCheckinBtn = "👀 每日签到"

@@ -11,6 +11,8 @@ type CheckinLog struct {
 
 	OldTraffic int64
 	NewTraffic int64
+
+	Fortune FortuneType
 }
 
 type ReportType string
